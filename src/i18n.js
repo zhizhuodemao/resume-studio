@@ -124,6 +124,15 @@ export const MESSAGES = {
       marginLabel: '页边距',
       margins: { compact: '紧凑', normal: '标准', relaxed: '宽松' },
     },
+    assistant: {
+      welcome:
+        '你好，我是你的 AI 简历助手。你可以直接吩咐我改内容、换模板、调排版，也可以把 JD 粘贴给我做匹配分析，或者聊聊你的经历——我会像教练一样帮你把它写进简历。',
+      placeholder: '吩咐 AI，或粘贴 JD、聊聊你的经历…',
+      findings: n => `${n} 条优化建议`,
+      undone: '已撤销',
+      suggestions: ['把工作经历改得更量化', '压缩到一页', '换个更适合投外企的模板', '帮我把简介写得更有冲击力'],
+    },
+    refine: { open: '精修', title: '精修编辑' },
     cmd: {
       placeholder: '对 AI 说：改内容、换模板、调排版…',
       send: '执行',
@@ -142,6 +151,7 @@ export const MESSAGES = {
         hide: '板块已隐藏',
         show: '板块已显示',
         translate: '已翻译',
+        tailored: '已创建定制版',
       },
     },
     preview: {
@@ -153,7 +163,7 @@ export const MESSAGES = {
       title: '求职信',
       hint: '开启（眼睛图标）后，求职信将作为附加页出现在预览与 PDF 导出中',
     },
-    mobile: { edit: '编辑', preview: '预览' },
+    mobile: { edit: 'AI 助手', preview: '预览' },
     photoEditor: {
       edit: '调整',
       title: '调整照片',
@@ -360,6 +370,15 @@ export const MESSAGES = {
       marginLabel: 'Margins',
       margins: { compact: 'Compact', normal: 'Default', relaxed: 'Relaxed' },
     },
+    assistant: {
+      welcome:
+        "Hi, I'm your AI resume assistant. Tell me to edit content, switch templates or tune the layout; paste a JD for a match analysis; or just talk about your experience — I'll coach it into the resume.",
+      placeholder: 'Ask AI, paste a JD, or talk about your experience…',
+      findings: n => `${n} suggestion${n > 1 ? 's' : ''}`,
+      undone: 'Undone',
+      suggestions: ['Make my experience more quantified', 'Fit to one page', 'Switch to a template for global companies', 'Punch up my summary'],
+    },
+    refine: { open: 'Refine', title: 'Refine editor' },
     cmd: {
       placeholder: 'Ask AI: rewrite content, switch template, tune layout…',
       send: 'Run',
@@ -378,6 +397,7 @@ export const MESSAGES = {
         hide: 'Section hidden',
         show: 'Section shown',
         translate: 'Translated',
+        tailored: 'Tailored copy created',
       },
     },
     preview: {
@@ -389,7 +409,7 @@ export const MESSAGES = {
       title: 'Cover Letter',
       hint: 'When enabled (eye icon), the cover letter is appended as an extra page in preview and PDF export',
     },
-    mobile: { edit: 'Edit', preview: 'Preview' },
+    mobile: { edit: 'AI', preview: 'Preview' },
     photoEditor: {
       edit: 'Adjust',
       title: 'Adjust photo',

@@ -15,12 +15,12 @@ import Preview from './components/Preview.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import Insight from './components/Insight.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
-import Coach from './components/Coach.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
-import { translateResume, applyCoachPatch } from './ai.js'
+import { translateResume, tailorResume } from './ai.js'
 import { downloadDocx, downloadText } from './exporters.js'
-import { commandTurn, applyCommandAction } from './commander.js'
-import CommandBar from './components/CommandBar.jsx'
+import { applyCommandAction } from './commander.js'
+import { assistantTurn } from './assistant.js'
+import Assistant from './components/Assistant.jsx'
 
 let loadedFresh = false
 
@@ -105,8 +105,7 @@ export default function App() {
     return p === 'insight' || p === 'coach' ? p : null
   })
   const [mobileView, setMobileView] = useState('edit')
-  const [cmdBusy, setCmdBusy] = useState(false)
-  const [cmdCards, setCmdCards] = useState([])
+  const [refineOpen, setRefineOpen] = useState(false)
   const measureRef = useRef({ content: 0, page: 1123 })
   const { lang, resumes, activeId } = state
   const active = resumes.find(d => d.id === activeId) || resumes[0]
@@ -433,13 +432,13 @@ export default function App() {
     [setResume],
   )
 
-  /* ---------- AI command bar ---------- */
-  const handleCommand = useCallback(
-    async instruction => {
+  /* ---------- Unified AI assistant ---------- */
+  const runAssistantTurn = useCallback(
+    async history => {
       const s0 = stateRef.current
       const doc = s0.resumes.find(d => d.id === s0.activeId)
-      if (!doc || cmdBusy) return
-      setCmdBusy(true)
+      if (!doc) return { message: '', labels: [], snapshot: null }
+      const { message, actions } = await assistantTurn(history, doc, t, s0.lang)
       const snapshot = {
         template: doc.template,
         accent: doc.accent,
@@ -447,82 +446,84 @@ export default function App() {
         page: doc.page,
         resume: doc.resume,
       }
-      try {
-        const { message, actions } = await commandTurn(instruction, doc, t)
-        let cur = { ...doc }
-        const labels = []
-        let wantsFit = false
-        let translateTarget = null
-        for (const a of actions) {
-          if (a.name === 'translate_resume') {
-            translateTarget = a.args?.target === 'en' ? 'en' : 'zh'
-            continue
-          }
-          const res = applyCommandAction(cur, a, t)
-          if (res) {
-            cur = res.doc
-            labels.push(res.label)
-            if (res.wantsFit) wantsFit = true
-          }
+      let cur = { ...doc }
+      const labels = []
+      let wantsFit = false
+      let translateTarget = null
+      let tailorJd = null
+      for (const a of actions) {
+        if (a.name === 'translate_resume') {
+          translateTarget = a.args?.target === 'en' ? 'en' : 'zh'
+          continue
         }
-        if (translateTarget) {
-          cur = { ...cur, resume: await translateResume(cur.resume, translateTarget) }
-          labels.push(t.cmd.labels.translate)
+        if (a.name === 'create_tailored_version') {
+          if (typeof a.args?.jd === 'string' && a.args.jd.trim()) tailorJd = a.args.jd
+          continue
         }
-        const changed = labels.length > 0
-        if (changed) {
-          pushHistory(s0.activeId, doc.resume)
-          patchDoc({
-            template: cur.template,
-            accent: cur.accent,
-            typography: cur.typography,
-            page: cur.page,
-            resume: cur.resume,
-          })
-          if (wantsFit) {
-            setTimeout(() => {
-              const m = measureRef.current
-              if (m.content > m.page) {
-                const scale = Math.max(0.75, Math.min(1, (m.page - 4) / m.content))
-                if (scale < 0.995) patchDoc({ page: { ...cur.page, fitScale: Math.round(scale * 100) / 100 } })
-              }
-            }, 450)
-          }
+        const res = applyCommandAction(cur, a, t)
+        if (res) {
+          cur = res.doc
+          labels.push(res.label)
+          if (res.wantsFit) wantsFit = true
         }
-        setCmdCards(cs => [
-          ...cs.slice(-2),
-          {
-            id: `${Date.now()}-${cs.length}`,
-            message: message || (changed ? t.cmd.done : t.cmd.noop),
-            labels,
-            snapshot: changed ? snapshot : null,
-          },
-        ])
-      } catch (err) {
-        console.error(err)
-        setCmdCards(cs => [
-          ...cs.slice(-2),
-          { id: `${Date.now()}-e`, message: t.ai.error, labels: [], snapshot: null, error: true },
-        ])
-      } finally {
-        setCmdBusy(false)
       }
+      if (translateTarget) {
+        cur = { ...cur, resume: await translateResume(cur.resume, translateTarget) }
+        labels.push(t.cmd.labels.translate)
+      }
+      const changed = labels.length > 0
+      if (changed) {
+        pushHistory(s0.activeId, doc.resume)
+        patchDoc({
+          template: cur.template,
+          accent: cur.accent,
+          typography: cur.typography,
+          page: cur.page,
+          resume: cur.resume,
+        })
+        if (wantsFit) {
+          setTimeout(() => {
+            const m = measureRef.current
+            if (m.content > m.page) {
+              const scale = Math.max(0.75, Math.min(1, (m.page - 4) / m.content))
+              if (scale < 0.995) patchDoc({ page: { ...cur.page, fitScale: Math.round(scale * 100) / 100 } })
+            }
+          }, 450)
+        }
+      }
+      if (tailorJd) {
+        const tailored = await tailorResume(cur.resume, tailorJd, s0.lang)
+        const copy = makeDoc({
+          ...cur,
+          name: `${doc.name || t.docs.untitled} · ${t.docs.tailoredSuffix}`,
+          resume: tailored,
+        })
+        setState(prev => ({ ...prev, resumes: [...prev.resumes, copy], activeId: copy.id }))
+        labels.push(t.cmd.labels.tailored)
+      }
+      return { message, labels, snapshot: changed ? snapshot : null }
     },
-    [t, cmdBusy, pushHistory, patchDoc],
+    [t, pushHistory, patchDoc],
   )
 
-  const handleUndoCard = useCallback(
-    id => {
-      setCmdCards(cs => {
-        const card = cs.find(c => c.id === id)
-        if (card?.snapshot) patchDoc(card.snapshot)
-        return cs.filter(c => c.id !== id)
-      })
-    },
-    [patchDoc],
-  )
+  const handleUndoSnapshot = useCallback(snapshot => patchDoc(snapshot), [patchDoc])
 
-  const handleDismissCard = useCallback(id => setCmdCards(cs => cs.filter(c => c.id !== id)), [])
+  // Clicking a section on the canvas opens refine mode at that card.
+  const handleSectionClick = useCallback(title => {
+    setRefineOpen(true)
+    setTimeout(() => {
+      for (const card of document.querySelectorAll('.editor .section-card')) {
+        const el = card.querySelector('.section-title, .section-title-input')
+        const name = (el?.value ?? el?.textContent ?? '').trim()
+        if (name && name === title) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          card.classList.add('flash')
+          setTimeout(() => card.classList.remove('flash'), 1200)
+          break
+        }
+      }
+    }, 80)
+  }, [])
 
   const handleExportDocx = () => active && downloadDocx(active.resume, t, active.name || 'resume')
   const handleExportText = () => active && downloadText(active.resume, t, active.name || 'resume')
@@ -598,35 +599,20 @@ export default function App() {
           canUndoTranslate={Boolean(translateBackup)}
           onUndoTranslate={handleUndoTranslate}
           onToggleInsight={() => setRightPanel(p => (p === 'insight' ? null : 'insight'))}
-          onToggleCoach={() => setRightPanel(p => (p === 'coach' ? null : 'coach'))}
+          refineOpen={refineOpen}
+          onToggleRefine={() => setRefineOpen(o => !o)}
         />
         <div className={`app-body mobile-${mobileView}`}>
-          <Editor
-            t={t}
-            resume={active.resume}
-            setResume={setResume}
-            placeholders={placeholders}
-            coverLetter={active.coverLetter}
-            onChangeCover={handleChangeCover}
-          />
+          <Assistant t={t} lang={lang} doc={active} onRunTurn={runAssistantTurn} onUndoSnapshot={handleUndoSnapshot} />
           <Preview
             t={t}
             page={active.page}
             onFitToggle={handleFitToggle}
             extraPage={coverNode}
+            onSectionClick={handleSectionClick}
             onMeasure={m => {
               measureRef.current = m
             }}
-            commandBar={
-              <CommandBar
-                t={t}
-                busy={cmdBusy}
-                cards={cmdCards}
-                onSubmit={handleCommand}
-                onUndoCard={handleUndoCard}
-                onDismissCard={handleDismissCard}
-              />
-            }
           >
             <ErrorBoundary
               resetKey={`${active.id}:${active.template}`}
@@ -636,6 +622,24 @@ export default function App() {
               {resumeNode}
             </ErrorBoundary>
           </Preview>
+          {refineOpen && (
+            <aside className="refine-panel" data-testid="refine-panel">
+              <div className="refine-head">
+                <span className="refine-title">{t.refine.title}</span>
+                <button className="icon-btn" title={t.insight.close} onClick={() => setRefineOpen(false)}>
+                  ✕
+                </button>
+              </div>
+              <Editor
+                t={t}
+                resume={active.resume}
+                setResume={setResume}
+                placeholders={placeholders}
+                coverLetter={active.coverLetter}
+                onChangeCover={handleChangeCover}
+              />
+            </aside>
+          )}
           {rightPanel === 'insight' && (
             <Insight
               t={t}
@@ -643,16 +647,6 @@ export default function App() {
               resume={active.resume}
               sectionsLabel={key => t.sections[key] || key}
               onCreateTailored={handleCreateTailored}
-              onClose={() => setRightPanel(null)}
-            />
-          )}
-          {rightPanel === 'coach' && (
-            <Coach
-              key={activeId}
-              t={t}
-              lang={lang}
-              resume={active.resume}
-              onApplyPatch={handleCoachPatch}
               onClose={() => setRightPanel(null)}
             />
           )}

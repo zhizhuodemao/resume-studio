@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
 
+const openRefine = page => page.getByTestId('refine-btn').click()
+
 // Each test gets a fresh browser context (clean localStorage).
 // `?onboarding=0` skips the first-run dialog and loads the default tech sample.
 
@@ -16,6 +18,7 @@ test('onboarding: pick a track and start with a tailored sample', async ({ page 
 
 test('editing a field updates the live preview', async ({ page }) => {
   await page.goto('/?onboarding=0')
+  await openRefine(page)
   const name = page.getByLabel('姓名')
   await name.fill('端到端测试员')
   await expect(page.locator('.page')).toContainText('端到端测试员')
@@ -23,13 +26,14 @@ test('editing a field updates the live preview', async ({ page }) => {
 
 test('switching template re-renders the preview', async ({ page }) => {
   await page.goto('/?onboarding=0')
-  await page.getByRole('button', { name: /模板/ }).click()
+  await page.getByRole('button', { name: /^模板/ }).click()
   await page.getByRole('radio', { name: /极简/ }).click()
   await expect(page.locator('.page .resume.tpl-minimal')).toHaveCount(1)
 })
 
 test('undo restores a deleted experience entry', async ({ page }) => {
   await page.goto('/?onboarding=0')
+  await openRefine(page)
   const expSection = page.locator('.section-card', { hasText: '工作经历' })
   const entries = expSection.locator('.entry-card')
   await expect(entries).toHaveCount(2)
@@ -102,6 +106,7 @@ test('schema v1 data in localStorage migrates to v2 on load', async ({ page }) =
 
 test('custom section: add preset, fill item, renders in preview', async ({ page }) => {
   await page.goto('/?onboarding=0')
+  await openRefine(page)
   await page.getByRole('button', { name: '添加板块' }).click()
   await page.getByRole('button', { name: '证书资质' }).click()
   // custom section titles live in an <input>, so match by value not text
@@ -117,6 +122,7 @@ test('custom section: add preset, fill item, renders in preview', async ({ page 
 
 test('rich text: bold markdown renders as <strong> in preview', async ({ page }) => {
   await page.goto('/?onboarding=0')
+  await openRefine(page)
   const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
   await summary.fill('拥有 **8 年** 大型项目经验')
   await expect(page.locator('.page strong').first()).toHaveText('8 年')
@@ -124,6 +130,7 @@ test('rich text: bold markdown renders as <strong> in preview', async ({ page })
 
 test('drag and drop reorders sections', async ({ page }) => {
   await page.goto('/?onboarding=0')
+  await openRefine(page)
   const skillsHandle = page.locator('.section-card', { hasText: '专业技能' }).locator('.drag-handle').first()
   const summaryCard = page.locator('.section-card', { hasText: '个人简介' })
   // dispatch HTML5 drag events deterministically (drives our React handlers)
@@ -149,13 +156,14 @@ test('layout controls: paper size, margins and fonts apply', async ({ page }) =>
 
 test('fit to one page compresses overflowing content', async ({ page }) => {
   await page.goto('/?onboarding=0')
+  await openRefine(page)
   const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
   await summary.fill('很长的内容。'.repeat(120))
   await expect(page.locator('.page-hint')).toContainText('共 2 页')
-  await page.getByRole('button', { name: '压缩到一页' }).click()
+  await page.locator('.page-hint').getByRole('button', { name: '压缩到一页' }).click()
   await expect(page.locator('.page-hint')).toContainText('共 1 页')
   // undo fit restores
-  await page.getByRole('button', { name: '取消压缩' }).click()
+  await page.locator('.page-hint').getByRole('button', { name: '取消压缩' }).click()
   await expect(page.locator('.page-hint')).toContainText('共 2 页')
 })
 
@@ -201,31 +209,31 @@ test('JD match analyzes against a mocked AI response', async ({ page }) => {
   await expect(drawer).toContainText('补充容器化相关经验')
 })
 
-test('coach agent: interview turn applies a patch to the resume', async ({ page }) => {
+test('assistant coaches: interview turn writes into the resume', async ({ page }) => {
   await page.route('**/api/ai/**', route =>
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
-          reply: '很棒！我把这段成果写进了你的简历。下一个问题：这个项目服务了多少用户？',
-          patch: { summary: '教练更新后的专业简介，突出量化成果。' },
-        }) } }],
+        choices: [{ message: {
+          content: '很棒！我把这段成果写进了你的简历。下一个问题：这个项目服务了多少用户？',
+          tool_calls: [
+            { id: '1', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '教练更新后的专业简介，突出量化成果。' }) } },
+          ],
+        } }],
       }),
     }),
   )
-  await page.goto('/?onboarding=0&panel=coach')
-  const drawer = page.getByTestId('coach-drawer')
-  await expect(drawer).toContainText('简历教练')
-  await drawer.locator('.coach-input').fill('我把转化率提升了 30%')
-  await drawer.getByRole('button', { name: '发送' }).click()
-  await expect(drawer).toContainText('下一个问题')
-  await expect(drawer).toContainText('已更新简历')
-  // patch applied to the live resume
-  const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
-  await expect(summary).toHaveValue('教练更新后的专业简介，突出量化成果。')
-  // and undo reverts it
-  await page.getByTitle('撤销 (Ctrl+Z)').click()
-  await expect(summary).not.toHaveValue('教练更新后的专业简介，突出量化成果。')
+  await page.goto('/?onboarding=0')
+  const assistant = page.getByTestId('assistant')
+  await page.getByTestId('cmd-input').fill('我把转化率提升了 30%')
+  await page.getByTestId('cmd-input').press('Enter')
+  await expect(assistant).toContainText('下一个问题')
+  await expect(assistant).toContainText('内容已更新')
+  await expect(page.locator('.preview .page')).toContainText('教练更新后的专业简介')
+  // per-turn undo reverts the change
+  await assistant.getByRole('button', { name: '撤销此次修改' }).click()
+  await expect(page.locator('.preview .page')).not.toContainText('教练更新后的专业简介')
+  await expect(assistant).toContainText('已撤销')
 })
 
 test('JD tailoring creates and opens a tailored copy', async ({ page }) => {
@@ -250,12 +258,11 @@ test('JD tailoring creates and opens a tailored copy', async ({ page }) => {
   await page.getByRole('button', { name: '开始分析' }).click()
   await page.getByTestId('tailor-btn').click()
   await expect(page.getByTestId('doc-switcher')).toContainText('定制版')
-  const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
-  await expect(summary).toHaveValue('为该职位定制的简介')
+  await expect(page.locator('.preview .page')).toContainText('为该职位定制的简介')
   // original doc unchanged
   await page.getByTestId('doc-switcher').click()
   await page.locator('.docs-item', { hasText: /^我的简历/ }).first().click()
-  await expect(summary).not.toHaveValue('为该职位定制的简介')
+  await expect(page.locator('.preview .page')).not.toContainText('为该职位定制的简介')
 })
 
 test('Word and TXT export download files', async ({ page }) => {
@@ -271,6 +278,7 @@ test('Word and TXT export download files', async ({ page }) => {
 
 test('cover letter renders as an extra preview page when enabled', async ({ page }) => {
   await page.goto('/?onboarding=0')
+  await openRefine(page)
   const coverCard = page.locator('.section-card', { hasText: '求职信' })
   await coverCard.locator('textarea').fill('尊敬的招聘经理：\n我对贵公司的职位很感兴趣。')
   await expect(page.locator('.preview .page')).toHaveCount(1) // still disabled
@@ -287,14 +295,14 @@ test('clicking a preview section jumps to its editor card', async ({ page }) => 
   await expect(page.locator('.section-card.flash', { hasText: '教育经历' })).toHaveCount(1)
 })
 
-test('mobile layout: tab bar switches between edit and preview', async ({ page }) => {
+test('mobile layout: tab bar switches between assistant and preview', async ({ page }) => {
   await page.setViewportSize({ width: 420, height: 800 })
   await page.goto('/?onboarding=0')
   await expect(page.locator('.mobile-tabs')).toBeVisible()
-  await expect(page.locator('.editor')).toBeVisible()
+  await expect(page.getByTestId('assistant')).toBeVisible()
   await expect(page.locator('.preview')).toBeHidden()
   await page.locator('.mobile-tabs').getByRole('button', { name: '预览' }).click()
-  await expect(page.locator('.editor')).toBeHidden()
+  await expect(page.getByTestId('assistant')).toBeHidden()
   await expect(page.locator('.preview')).toBeVisible()
 })
 
@@ -316,7 +324,7 @@ test('toolbar fits common laptop widths without horizontal overflow', async ({ p
 test('AI menu and more menu expose the consolidated actions', async ({ page }) => {
   await page.goto('/?onboarding=0')
   await page.getByTestId('ai-menu-btn').click()
-  await expect(page.getByTestId('coach-btn')).toBeVisible()
+  await expect(page.getByTestId('insight-btn')).toBeVisible()
   await expect(page.getByRole('button', { name: '译成英文' })).toBeVisible()
   await page.keyboard.press('Escape')
   await page.getByTestId('more-btn').click()
@@ -325,7 +333,7 @@ test('AI menu and more menu expose the consolidated actions', async ({ page }) =
   await expect(page.getByRole('button', { name: 'EN' })).toBeVisible()
 })
 
-test('AI command bar executes tool calls and supports card undo', async ({ page }) => {
+test('assistant executes tool calls and supports per-turn undo', async ({ page }) => {
   await page.route('**/api/ai/**', route =>
     route.fulfill({
       contentType: 'application/json',
@@ -334,7 +342,7 @@ test('AI command bar executes tool calls and supports card undo', async ({ page 
           content: '好的，已切换到时间线模板并更新了简介。',
           tool_calls: [
             { id: '1', type: 'function', function: { name: 'set_template', arguments: '{"template":"timeline"}' } },
-            { id: '2', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '命令栏更新的简介' }) } },
+            { id: '2', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '助手更新的简介' }) } },
           ],
         } }],
       }),
@@ -344,15 +352,11 @@ test('AI command bar executes tool calls and supports card undo', async ({ page 
   const input = page.getByTestId('cmd-input')
   await input.fill('换成时间线模板，简介重写一下')
   await input.press('Enter')
-  // actions applied
   await expect(page.locator('.preview .resume.tpl-timeline')).toHaveCount(1)
-  const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
-  await expect(summary).toHaveValue('命令栏更新的简介')
-  // change card with labels
-  const card = page.locator('.cmd-card')
-  await expect(card).toContainText('时间线')
-  // undo restores everything
-  await card.getByRole('button', { name: '撤销此次修改' }).click()
+  await expect(page.locator('.preview .page')).toContainText('助手更新的简介')
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant).toContainText('时间线')
+  await assistant.getByRole('button', { name: '撤销此次修改' }).click()
   await expect(page.locator('.preview .resume.tpl-modern')).toHaveCount(1)
-  await expect(summary).not.toHaveValue('命令栏更新的简介')
+  await expect(page.locator('.preview .page')).not.toContainText('助手更新的简介')
 })

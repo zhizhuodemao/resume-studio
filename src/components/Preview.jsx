@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { PAGE_DIMENSIONS } from '../store.js'
 
-export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, commandBar, children }) {
+export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, onSectionClick, children }) {
   const dims = PAGE_DIMENSIONS[page?.size] || PAGE_DIMENSIONS.a4
   const fitActive = Boolean(page?.fitScale && page.fitScale < 1)
 
@@ -28,21 +28,11 @@ export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, co
 
   const pageCount = Math.max(1, Math.ceil((contentHeight - 8) / dims.height))
 
-  // Click a section in the preview -> scroll the matching editor card into view
+  // Click a section in the preview -> open refine mode at the matching card
   const jumpToEditor = e => {
     const heading = e.target.closest('section')?.querySelector('h2')
     const title = heading?.textContent?.trim()
-    if (!title) return
-    for (const card of document.querySelectorAll('.editor .section-card')) {
-      const el = card.querySelector('.section-title, .section-title-input')
-      const name = (el?.value ?? el?.textContent ?? '').trim()
-      if (name && name === title) {
-        card.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        card.classList.add('flash')
-        setTimeout(() => card.classList.remove('flash'), 1200)
-        break
-      }
-    }
+    if (title) onSectionClick?.(title)
   }
 
   return (
@@ -87,7 +77,6 @@ export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, co
           </button>
         )}
       </p>
-      {commandBar}
     </main>
   )
 }

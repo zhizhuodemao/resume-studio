@@ -193,7 +193,8 @@ export default function Toolbar({
   canUndoTranslate,
   onUndoTranslate,
   onToggleInsight,
-  onToggleCoach,
+  refineOpen,
+  onToggleRefine,
 }) {
   // ?menu=template|typo|sample|ai deep-links a panel open
   const initialMenu = new URLSearchParams(window.location.search).get('menu')
@@ -381,6 +382,14 @@ export default function Toolbar({
           )}
         </div>
 
+        <button
+          className={`btn btn-select ${refineOpen ? 'open' : ''}`}
+          onClick={onToggleRefine}
+          data-testid="refine-btn"
+        >
+          ✎ {t.refine.open}
+        </button>
+
         <div className="accent-picker" aria-label={t.accentColor}>
           {ACCENT_PRESETS.map(c => (
             <button
@@ -424,16 +433,6 @@ export default function Toolbar({
                 }}
               >
                 {t.insight.open}
-              </button>
-              <button
-                className="menu-item"
-                data-testid="coach-btn"
-                onClick={() => {
-                  aiPop.setOpen(false)
-                  onToggleCoach()
-                }}
-              >
-                {t.coach.open}
               </button>
               <div className="menu-divider" />
               <button

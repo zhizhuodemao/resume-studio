@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { uid } from '../sampleData.js'
 import { polishText } from '../ai.js'
@@ -119,8 +119,99 @@ function ItemToolbar({ t, index, total, onMove, onRemove }) {
   )
 }
 
+function PhotoEditModal({ t, src, onSave, onClose }) {
+  const SIZE = 280
+  const canvasRef = useRef(null)
+  const imgRef = useRef(null)
+  const dragRef = useRef(null)
+  const [zoom, setZoom] = useState(1)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+
+  const draw = (targetCanvas, scaleFactor = 1) => {
+    const canvas = targetCanvas || canvasRef.current
+    const img = imgRef.current
+    if (!canvas || !img) return
+    const size = SIZE * scaleFactor
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, size, size)
+    const cover = Math.max(size / img.width, size / img.height)
+    const s = cover * zoom
+    const w = img.width * s
+    const h = img.height * s
+    ctx.drawImage(img, size / 2 - w / 2 + pos.x * scaleFactor, size / 2 - h / 2 + pos.y * scaleFactor, w, h)
+  }
+
+  useEffect(() => {
+    const img = new Image()
+    img.onload = () => {
+      imgRef.current = img
+      draw()
+    }
+    img.src = src
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src])
+
+  // redraw whenever zoom / position changes
+  useEffect(() => {
+    draw()
+  })
+
+  const onPointerDown = e => {
+    dragRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y }
+    e.target.setPointerCapture(e.pointerId)
+  }
+  const onPointerMove = e => {
+    if (!dragRef.current) return
+    setPos({ x: e.clientX - dragRef.current.x, y: e.clientY - dragRef.current.y })
+  }
+  const onPointerUp = () => {
+    dragRef.current = null
+  }
+
+  const save = () => {
+    const out = document.createElement('canvas')
+    const factor = 480 / SIZE
+    out.width = 480
+    out.height = 480
+    draw(out, factor)
+    onSave(out.toDataURL('image/jpeg', 0.88))
+  }
+
+  return (
+    <div className="onboard-overlay" role="dialog" aria-modal="true">
+      <div className="photo-modal">
+        <h2 className="photo-modal-title">{t.photoEditor.title}</h2>
+        <canvas
+          ref={canvasRef}
+          width={SIZE}
+          height={SIZE}
+          className="photo-canvas"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        />
+        <p className="photo-modal-hint">{t.photoEditor.hint}</p>
+        <label className="photo-zoom">
+          <span>{t.photoEditor.zoom}</span>
+          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={e => setZoom(Number(e.target.value))} />
+        </label>
+        <div className="onboard-actions">
+          <button className="btn btn-primary" onClick={save}>
+            {t.photoEditor.save}
+          </button>
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t.photoEditor.cancel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PhotoField({ t, photo, onChange }) {
   const inputRef = useRef(null)
+  const [editing, setEditing] = useState(false)
 
   const handleFile = file => {
     if (!file) return
@@ -156,9 +247,23 @@ function PhotoField({ t, photo, onChange }) {
         />
         <button className="btn btn-small" onClick={() => inputRef.current.click()}>{t.fields.uploadPhoto}</button>
         {photo && (
-          <button className="btn btn-small btn-danger" onClick={() => onChange('')}>{t.fields.removePhoto}</button>
+          <>
+            <button className="btn btn-small" onClick={() => setEditing(true)}>{t.photoEditor.edit}</button>
+            <button className="btn btn-small btn-danger" onClick={() => onChange('')}>{t.fields.removePhoto}</button>
+          </>
         )}
       </div>
+      {editing && (
+        <PhotoEditModal
+          t={t}
+          src={photo}
+          onSave={v => {
+            onChange(v)
+            setEditing(false)
+          }}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </div>
   )
 }

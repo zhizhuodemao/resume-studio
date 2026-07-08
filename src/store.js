@@ -5,11 +5,17 @@ export const STORAGE_KEY = 'resume-studio-v2'
 export const LEGACY_STORAGE_KEY = 'resume-studio-v1'
 
 export const DEFAULT_TYPOGRAPHY = { font: 'default', size: 'm', density: 'normal' }
+export const DEFAULT_PAGE = { size: 'a4', margin: 'normal', fitScale: 1 }
 export const DEFAULT_ACCENT = '#2563eb'
+
+export const PAGE_DIMENSIONS = {
+  a4: { width: 794, height: 1123 }, // 210×297mm @96dpi
+  letter: { width: 816, height: 1056 }, // 8.5×11in @96dpi
+}
 
 /* ---------- Document factory & normalization ---------- */
 
-export function makeDoc({ name = '', resume, template = 'modern', accent = DEFAULT_ACCENT, track = null, typography } = {}) {
+export function makeDoc({ name = '', resume, template = 'modern', accent = DEFAULT_ACCENT, track = null, typography, page } = {}) {
   const now = new Date().toISOString()
   return {
     id: uid(),
@@ -20,6 +26,7 @@ export function makeDoc({ name = '', resume, template = 'modern', accent = DEFAU
     accent,
     track,
     typography: { ...DEFAULT_TYPOGRAPHY, ...typography },
+    page: { ...DEFAULT_PAGE, ...page },
     resume: normalizeResume(resume || emptyResume()),
   }
 }
@@ -95,7 +102,17 @@ function normalizeDoc(d) {
     accent: /^#[0-9a-fA-F]{6}$/.test(doc.accent) ? doc.accent : DEFAULT_ACCENT,
     track: typeof doc.track === 'string' ? doc.track : null,
     typography: { ...DEFAULT_TYPOGRAPHY, ...(doc.typography && typeof doc.typography === 'object' ? doc.typography : {}) },
+    page: normalizePage(doc.page),
     resume: normalizeResume(doc.resume),
+  }
+}
+
+function normalizePage(p) {
+  const page = p && typeof p === 'object' ? p : {}
+  return {
+    size: page.size === 'letter' ? 'letter' : 'a4',
+    margin: ['compact', 'normal', 'relaxed'].includes(page.margin) ? page.margin : 'normal',
+    fitScale: typeof page.fitScale === 'number' && page.fitScale >= 0.7 && page.fitScale <= 1 ? page.fitScale : 1,
   }
 }
 

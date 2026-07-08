@@ -134,3 +134,27 @@ test('drag and drop reorders sections', async ({ page }) => {
   // 技能板块被拖到个人简介位置 → 预览中第一个板块标题应为 专业技能
   await expect(page.locator('.page .m-section').first()).toContainText('专业技能')
 })
+
+test('layout controls: paper size, margins and fonts apply', async ({ page }) => {
+  await page.goto('/?onboarding=0&menu=typo')
+  // Letter paper resizes the preview page
+  await page.getByRole('button', { name: 'Letter' }).click()
+  await expect(page.locator('.preview .page')).toHaveCSS('width', '816px')
+  // compact margins + kai font map to resume classes
+  await page.locator('.typo-row', { hasText: '页边距' }).getByRole('button', { name: '紧凑' }).click()
+  await page.getByRole('button', { name: '楷体' }).click()
+  await expect(page.locator('.preview .resume')).toHaveClass(/margin-compact/)
+  await expect(page.locator('.preview .resume')).toHaveClass(/font-kai/)
+})
+
+test('fit to one page compresses overflowing content', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
+  await summary.fill('很长的内容。'.repeat(120))
+  await expect(page.locator('.page-hint')).toContainText('共 2 页')
+  await page.getByRole('button', { name: '压缩到一页' }).click()
+  await expect(page.locator('.page-hint')).toContainText('共 1 页')
+  // undo fit restores
+  await page.getByRole('button', { name: '取消压缩' }).click()
+  await expect(page.locator('.page-hint')).toContainText('共 2 页')
+})

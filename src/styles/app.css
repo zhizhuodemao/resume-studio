@@ -618,6 +618,69 @@ textarea {
   line-height: 1.5;
 }
 
+/* Photo editor modal */
+.photo-modal {
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 24px 26px;
+  width: 340px;
+  box-shadow:
+    0 24px 64px -12px rgba(16, 24, 40, 0.35),
+    0 2px 8px rgba(16, 24, 40, 0.08);
+}
+
+.photo-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+
+.photo-canvas {
+  display: block;
+  margin: 0 auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  cursor: grab;
+  touch-action: none;
+}
+
+.photo-canvas:active {
+  cursor: grabbing;
+}
+
+.photo-modal-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  text-align: center;
+  margin: 8px 0 4px;
+}
+
+.photo-zoom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 8px 0 4px;
+}
+
+.photo-zoom input {
+  flex: 1;
+  accent-color: var(--ink);
+}
+
+/* Preview footer */
+.page-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fit-btn.active {
+  background: var(--ink);
+  color: #fff;
+}
+
 /* Drag & drop, custom sections, rich text */
 .drag-handle {
   cursor: grab;

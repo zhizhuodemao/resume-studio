@@ -1,41 +1,66 @@
 import { useEffect, useRef, useState } from 'react'
+import { PAGE_DIMENSIONS } from '../store.js'
 
-export const PAGE_W = 794 // A4 width @ 96dpi
-export const PAGE_H = 1123 // A4 height @ 96dpi
+export default function Preview({ t, page, onFitToggle, children }) {
+  const dims = PAGE_DIMENSIONS[page?.size] || PAGE_DIMENSIONS.a4
+  const fitActive = Boolean(page?.fitScale && page.fitScale < 1)
 
-export default function Preview({ t, children }) {
   const areaRef = useRef(null)
   const pageRef = useRef(null)
   const [scale, setScale] = useState(0.8)
-  const [pageHeight, setPageHeight] = useState(PAGE_H)
+  const [contentHeight, setContentHeight] = useState(dims.height)
 
   useEffect(() => {
     const area = areaRef.current
-    const page = pageRef.current
+    const pageEl = pageRef.current
     const update = () => {
       const available = area.clientWidth - 64
-      setScale(Math.min(1, available / PAGE_W))
-      setPageHeight(page.offsetHeight)
+      setScale(Math.min(1, available / dims.width))
+      setContentHeight(pageEl.offsetHeight)
     }
     const ro = new ResizeObserver(update)
     ro.observe(area)
-    ro.observe(page)
+    ro.observe(pageEl)
     update()
     return () => ro.disconnect()
-  }, [])
+  }, [dims.width])
+
+  const pageCount = Math.max(1, Math.ceil((contentHeight - 8) / dims.height))
 
   return (
     <main className="preview" ref={areaRef}>
       <div
         className="preview-canvas"
-        style={{ width: PAGE_W * scale, height: pageHeight * scale }}
+        style={{ width: dims.width * scale, height: contentHeight * scale }}
       >
-        <div className="page" ref={pageRef} style={{ transform: `scale(${scale})` }}>
+        <div
+          className="page"
+          ref={pageRef}
+          style={{ transform: `scale(${scale})`, width: dims.width, minHeight: dims.height }}
+        >
           {children}
-          <div className="page-break-overlay" aria-hidden="true" />
+          <div
+            className="page-break-overlay"
+            aria-hidden="true"
+            style={{
+              background: `repeating-linear-gradient(to bottom, transparent 0, transparent ${dims.height - 1}px, rgba(225, 29, 72, 0.35) ${dims.height - 1}px, rgba(225, 29, 72, 0.35) ${dims.height}px)`,
+            }}
+          />
         </div>
       </div>
-      <p className="page-hint">{t.pageBreakHint}</p>
+      <p className="page-hint">
+        <span>
+          {t.preview.pages(pageCount)} · {t.pageBreakHint}
+        </span>
+        {(pageCount > 1 || fitActive) && (
+          <button
+            className={`btn btn-small fit-btn ${fitActive ? 'active' : ''}`}
+            onClick={() => onFitToggle(contentHeight, dims.height)}
+          >
+            {fitActive ? t.preview.unfit : t.preview.fit}
+          </button>
+        )}
+      </p>
     </main>
   )
 }

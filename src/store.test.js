@@ -118,3 +118,21 @@ describe('custom sections normalization', () => {
     expect(out.sectionOrder).toContain('custom:c1')
   })
 })
+
+describe('page settings', () => {
+  it('defaults page settings on docs that lack them', () => {
+    const out = migrate(v1State)
+    expect(out.resumes[0].page).toEqual({ size: 'a4', margin: 'normal', fitScale: 1 })
+  })
+  it('sanitizes invalid page values', () => {
+    const doc = makeDoc({ resume: v1State.resume, page: { size: 'tabloid', margin: 'huge', fitScale: 0.2 } })
+    expect(doc.page.size).toBe('tabloid') // makeDoc trusts caller...
+    const out = migrate({ version: 2, activeId: doc.id, resumes: [doc] })
+    expect(out.resumes[0].page).toEqual({ size: 'a4', margin: 'normal', fitScale: 1 })
+  })
+  it('keeps valid page values through migration', () => {
+    const doc = makeDoc({ resume: v1State.resume, page: { size: 'letter', margin: 'compact', fitScale: 0.85 } })
+    const out = migrate({ version: 2, activeId: doc.id, resumes: [doc] })
+    expect(out.resumes[0].page).toEqual({ size: 'letter', margin: 'compact', fitScale: 0.85 })
+  })
+})

@@ -57,7 +57,13 @@ function initialState() {
     if (loadedFresh) patchActive({ resume: getSample(active().track || 'tech', 'social', lang) })
   }
   if (accent && /^#[0-9a-fA-F]{6}$/.test(accent)) patchActive({ accent })
-  if (font && ['default', 'sans', 'serif'].includes(font)) patchActive({ typography: { ...active().typography, font } })
+  const paper = params.get('paper')
+  if (paper && ['a4', 'letter'].includes(paper)) patchActive({ page: { ...active().page, size: paper } })
+  const marginParam = params.get('margin')
+  if (marginParam && ['compact', 'normal', 'relaxed'].includes(marginParam))
+    patchActive({ page: { ...active().page, margin: marginParam } })
+  if (font && ['default', 'sans', 'serif', 'kai', 'fang'].includes(font))
+    patchActive({ typography: { ...active().typography, font } })
   if (size && ['s', 'm', 'l'].includes(size)) patchActive({ typography: { ...active().typography, size } })
   if (density && ['compact', 'normal', 'relaxed'].includes(density))
     patchActive({ typography: { ...active().typography, density } })
@@ -365,6 +371,25 @@ export default function App() {
     setTranslateBackup(null)
   }
 
+  /* ---------- Page fit (one-page compression) ---------- */
+  const handleFitToggle = useCallback(
+    (contentHeight, pageHeight) => {
+      const s = stateRef.current
+      const doc = s.resumes.find(d => d.id === s.activeId)
+      if (!doc) return
+      const fitActive = doc.page.fitScale < 1
+      if (fitActive) {
+        patchDoc({ page: { ...doc.page, fitScale: 1 } })
+        return
+      }
+      // contentHeight was measured at fitScale=1; shrink typography until it fits
+      const scale = Math.max(0.75, Math.min(1, (pageHeight - 4) / contentHeight))
+      if (scale >= 0.995) return
+      patchDoc({ page: { ...doc.page, fitScale: Math.round(scale * 100) / 100 } })
+    },
+    [patchDoc],
+  )
+
   const placeholders = useMemo(() => getPlaceholders(active?.track, lang), [active?.track, lang])
 
   const resumeNode = useMemo(
@@ -375,6 +400,7 @@ export default function App() {
           resume={active.resume}
           accent={active.accent}
           typography={active.typography}
+          page={active.page}
           t={t}
         />
       ) : null,
@@ -392,6 +418,7 @@ export default function App() {
           template={active.template}
           accent={active.accent}
           typography={active.typography}
+          page={active.page}
           track={active.track}
           savedAt={savedAt}
           onPatch={patch}
@@ -419,9 +446,12 @@ export default function App() {
         />
         <div className="app-body">
           <Editor t={t} resume={active.resume} setResume={setResume} placeholders={placeholders} />
-          <Preview t={t}>{resumeNode}</Preview>
+          <Preview t={t} page={active.page} onFitToggle={handleFitToggle}>
+            {resumeNode}
+          </Preview>
         </div>
       </div>
+      {active.page.size === 'letter' && <style>{'@media print { @page { size: letter; margin: 0 } }'}</style>}
       {onboarding && (
         <Onboarding
           t={t}

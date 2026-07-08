@@ -165,6 +165,7 @@ export default function Toolbar({
   template,
   accent,
   typography,
+  page,
   track,
   savedAt,
   onPatch,
@@ -331,7 +332,7 @@ export default function Toolbar({
                 <Segmented
                   value={typography.font}
                   onChange={v => setTypo({ font: v })}
-                  options={['default', 'sans', 'serif'].map(v => ({ value: v, label: t.typo.fonts[v] }))}
+                  options={['default', 'sans', 'serif', 'kai', 'fang'].map(v => ({ value: v, label: t.typo.fonts[v] }))}
                 />
               </div>
               <div className="typo-row">
@@ -348,6 +349,22 @@ export default function Toolbar({
                   value={typography.density}
                   onChange={v => setTypo({ density: v })}
                   options={['compact', 'normal', 'relaxed'].map(v => ({ value: v, label: t.typo.densities[v] }))}
+                />
+              </div>
+              <div className="typo-row">
+                <span className="typo-label">{t.typo.paper}</span>
+                <Segmented
+                  value={page.size}
+                  onChange={v => onPatchDoc({ page: { ...page, size: v } })}
+                  options={['a4', 'letter'].map(v => ({ value: v, label: t.typo.papers[v] }))}
+                />
+              </div>
+              <div className="typo-row">
+                <span className="typo-label">{t.typo.marginLabel}</span>
+                <Segmented
+                  value={page.margin}
+                  onChange={v => onPatchDoc({ page: { ...page, margin: v } })}
+                  options={['compact', 'normal', 'relaxed'].map(v => ({ value: v, label: t.typo.margins[v] }))}
                 />
               </div>
             </div>

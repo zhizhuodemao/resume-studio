@@ -21,13 +21,20 @@ const toolCall = (name, args, id = 'c1') => ({ id, type: 'function', function: {
 // Each test gets a fresh browser context (clean localStorage).
 // `?onboarding=0` skips the first-run dialog and loads the default tech sample.
 
-test('onboarding: pick a track and start with a tailored sample', async ({ page }) => {
+test('onboarding: pick a track, land on the interview stage', async ({ page }) => {
+  await mockAgent(page, [{ content: '第一个问题：你最近一段工作里最有成就感的事是什么？' }])
   await page.goto('/')
   await expect(page.getByText('先认识一下你')).toBeVisible()
   await page.getByRole('button', { name: '产品', exact: true }).click()
   await page.getByRole('button', { name: '开始制作' }).click()
-  await expect(page.getByText('先认识一下你')).toBeHidden()
-  // Product sample loaded with its recommended template (timeline)
+  // entry inversion: first-run lands on the Stage, not the editor
+  const stage = page.getByTestId('stage')
+  await expect(stage).toBeVisible()
+  // no JD yet → JD-first entry screen; skip straight to talking
+  await page.getByTestId('stage-start').click()
+  await expect(page.getByTestId('stage-question')).toContainText('最有成就感', { timeout: 10_000 })
+  // exit to the workbench: the tailored sample is there
+  await page.getByTestId('stage-exit').click()
   await expect(page.locator('.page .resume.tpl-timeline')).toHaveCount(1)
   await expect(page.locator('.page')).toContainText('苏明远')
 })
@@ -333,28 +340,17 @@ test('assistant executes tool calls with live canvas highlight and undo', async 
   await expect(page.locator('.preview .page')).not.toContainText('助手更新的简介')
 })
 
-test('JD pasted in onboarding triggers an automatic assistant analysis', async ({ page }) => {
-  await page.route('**/api/ai/**', route =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        choices: [{ message: {
-          content: '匹配度不错：你的 React 经验是加分项；差距是缺少 K8s。需要我生成定制版吗？',
-          tool_calls: [],
-        } }],
-      }),
-    }),
-  )
+test('JD pasted in onboarding routes into a targeted stage interview', async ({ page }) => {
+  await mockAgent(page, [{ content: '这个岗位要求增长经验——你做过最能体现增长能力的一件事是什么？' }])
   await page.goto('/')
   await page.getByRole('button', { name: '产品', exact: true }).click()
-  await page.locator('.onboard-jd').fill('招聘高级产品经理，要求 B 端 SaaS 经验')
+  await page.locator('.onboard-jd').fill('招聘高级产品经理：负责增长策略，要求数据驱动')
   await page.getByRole('button', { name: '开始制作' }).click()
-  const assistant = page.getByTestId('assistant')
-  // the pasted JD becomes the first user message automatically
-  await expect(assistant).toContainText('这是我目标职位的 JD')
-  await expect(assistant).toContainText('需要我生成定制版吗')
+  await expect(page.getByTestId('stage')).toBeVisible()
+  await expect(page.getByTestId('stage-question')).toContainText('增长', { timeout: 10_000 })
+  await page.getByTestId('stage-exit').click()
+  await expect(page.getByTestId('jd-btn')).toContainText('目标岗位')
 })
-
 test('assistant streams SSE: typed deltas and fragmented tool calls', async ({ page }) => {
   const sse = [
     'data: {"choices":[{"delta":{"content":"正在为你"}}]}',
@@ -600,17 +596,32 @@ test('JD workspace: save target, analyze match, keyword chips prefill', async ({
   await expect(page.getByTestId('jd-btn')).toContainText('目标岗位 · 68')
 })
 
-test('coach progress panel maps weak areas and prefills an interview', async ({ page }) => {
+test('vault dashboard: migrated v2 resumes appear as stub stories', async ({ page }) => {
+  await page.addInitScript(() => {
+    const doc = {
+      id: 'old-1', name: '老简历', template: 'modern', accent: '#2563eb',
+      typography: { font: 'default', size: 'm', density: 'normal' },
+      page: { size: 'a4', margin: 'normal', fitScale: 1 },
+      coverLetter: { enabled: false, content: '' },
+      resume: {
+        basics: { name: '老用户', title: 'PM', email: '', phone: '', location: '', website: '', github: '', photo: '', summary: '' },
+        experience: [{ id: 'e1', company: '云徙科技', role: '高级产品经理', start: '', end: '', location: '', highlights: '负责 CRM 产品线' }],
+        projects: [{ id: 'p1', name: '企业微信生态集成', role: '', link: '', description: '主导打通' }],
+        education: [], skills: [], customSections: [],
+        sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills'],
+        hiddenSections: [],
+      },
+    }
+    localStorage.setItem('resume-studio-v2', JSON.stringify({ version: 2, lang: 'zh', activeId: 'old-1', resumes: [doc] }))
+  })
   await page.goto('/?onboarding=0')
-  await page.getByTestId('doc-switcher').click()
-  await page.getByRole('button', { name: '新建空白' }).click()
-  await page.getByTestId('coverage-btn').click()
-  const panel = page.getByTestId('coverage-panel')
-  await expect(panel.locator('.coverage-row.status-missing').first()).toBeVisible()
-  await panel.locator('.coverage-row', { hasText: '工作经历' }).click()
-  await expect(page.getByTestId('cmd-input')).toHaveValue(/围绕「工作经历」向我提问/)
+  const vaultBtn = page.getByTestId('vault-btn')
+  await expect(vaultBtn).toContainText('2')
+  await vaultBtn.click()
+  const panel = page.getByTestId('vault-panel')
+  await expect(panel).toContainText('高级产品经理 @ 云徙科技')
+  await expect(panel).toContainText('企业微信生态集成')
 })
-
 test('conversation identity: user right-aligned dark, assistant left with avatar', async ({ page }) => {
   await mockAgent(page, [{ content: '收到，这是一条测试回复。' }])
   await page.goto('/?onboarding=0')
@@ -675,4 +686,147 @@ test('delete and clear use the in-app confirm dialog', async ({ page }) => {
   await expect(page.getByTestId('app-dialog')).toContainText('清空')
   await page.getByTestId('dialog-ok').click()
   await expect(page.locator('.page')).not.toContainText('陈嘉禾')
+})
+
+test('stage full loop: JD entry → question → answer → receipt → resume grows → summary', async ({ page }) => {
+  await mockAgent(page, [
+    { content: '你在云徙做的最有分量的一件事是什么？' },
+    { content: '', tool_calls: [
+      toolCall('upsert_story', {
+        title: '重构线索-商机流程', action: '重构了 CRM 线索到商机的核心流程',
+        metrics: ['转化率 +27%'], asked: '最有分量的一件事？', quote: '重构了线索流程，转化率提升了 27%',
+      }, 'c1'),
+      toolCall('update_resume_content', { summary: '重构线索流程，核心转化率提升 27%。' }, 'c2'),
+    ] },
+    { content: '记下了：转化率 +27%。这个重构影响了多少企业客户？' },
+  ])
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('stage-btn').click()
+  const stage = page.getByTestId('stage')
+  // fresh user, no vault, no JD → entry phase
+  await page.getByTestId('stage-jd').fill('招聘高级产品经理，要求 CRM 经验与数据驱动')
+  await page.getByTestId('stage-start').click()
+  // Q1 arrives
+  await expect(page.getByTestId('stage-question')).toContainText('最有分量')
+  // answer by typing (voice path shares the same input)
+  await page.getByTestId('stage-input').fill('我重构了线索流程，转化率提升 27%')
+  await page.getByTestId('stage-input').press('Enter')
+  // receipt + next question + mined counter + thumbnail grew
+  await expect(stage.locator('.stage-receipt')).toContainText('重构线索-商机流程')
+  await expect(page.getByTestId('stage-question')).toContainText('多少企业客户')
+  await expect(page.getByTestId('stage-mined')).toContainText('+1 个故事')
+  await expect(stage.locator('.stage-thumb')).toContainText('转化率提升 27%')
+  // finish → 成果单
+  await page.getByTestId('stage-finish').click()
+  const summary = page.getByTestId('stage-summary')
+  await expect(summary).toContainText('本次挖掘成果')
+  await expect(summary.locator('.stage-summary-stats')).toContainText('1')
+  await page.getByTestId('stage-to-workbench').click()
+  // workbench: resume updated, vault has the story, jd saved
+  await expect(page.locator('.preview .page')).toContainText('转化率提升 27%')
+  await expect(page.getByTestId('vault-btn')).toContainText('1')
+  await expect(page.getByTestId('jd-btn')).toContainText('目标岗位')
+  // persistence: reload keeps the vault
+  await page.reload()
+  await expect(page.getByTestId('vault-btn')).toContainText('1')
+})
+
+test('cross-session memory: the interviewer never re-asks answered questions', async ({ page }) => {
+  const captured = []
+  let call = 0
+  await page.route('**/api/ai/**', route => {
+    captured.push(JSON.parse(route.request().postData()))
+    call += 1
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: `问题 ${call}` } }] }),
+    })
+  })
+  // seed a v3 state whose story already has an asked/refused history
+  await page.addInitScript(() => {
+    const doc = {
+      id: 'd1', name: 'R', template: 'modern', accent: '#2563eb',
+      typography: { font: 'default', size: 'm', density: 'normal' },
+      page: { size: 'a4', margin: 'normal', fitScale: 1 },
+      coverLetter: { enabled: false, content: '' },
+      resume: {
+        basics: { name: 'U', title: '', email: '', phone: '', location: '', website: '', github: '', photo: '', summary: '' },
+        experience: [], projects: [], education: [], skills: [], customSections: [],
+        sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills'], hiddenSections: [],
+      },
+    }
+    const story = {
+      id: 'st1', title: '重构线索流程',
+      star: { s: '', t: '', a: '重构了核心流程做了很多事情', r: '' },
+      metrics: [], skills: [], source: 'interview', sources: [],
+      askedFollowups: ['当时团队有多少人？'], refusals: ['薪资范围是多少？'],
+    }
+    localStorage.setItem('resume-studio-v2', JSON.stringify({
+      version: 3, lang: 'zh', activeId: 'd1', resumes: [doc], vault: { stories: [story] },
+    }))
+  })
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('stage-btn').click()
+  // vault non-empty → straight to live phase; kickoff request fires
+  await expect(page.getByTestId('stage-question')).toContainText('问题 1')
+  // the system context must carry the asked/refused lists for the target story
+  const system = captured[0].messages.find(m => m.role === 'system').content
+  expect(system).toContain('当时团队有多少人？')
+  expect(system).toContain('薪资范围是多少？')
+  expect(system).toContain('不要重复')
+})
+
+test('stage entry: language toggle and paste-resume path', async ({ page }) => {
+  await mockAgent(page, [
+    // call 1: parseResumeText (non-stream chat) returns structured resume JSON
+    { content: JSON.stringify({
+        basics: { name: '王五', title: '数据分析师', email: '', phone: '', location: '', summary: '' },
+        experience: [{ company: '数元科技', role: '数据分析师', start: '2021.03', end: '', location: '', highlights: '搭建经营看板\n负责 AB 实验' }],
+        projects: [], education: [], skills: [{ name: 'SQL', detail: '' }],
+      }) },
+    // call 2: interview kickoff question
+    { content: '你在数元科技搭的经营看板，服务多少个业务方？' },
+  ])
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('stage-btn').click()
+  // language selection lives on the entry screen
+  const langSeg = page.getByTestId('stage-lang')
+  await expect(langSeg).toBeVisible()
+  await langSeg.getByRole('button', { name: 'English' }).click()
+  await expect(page.getByTestId('stage')).toContainText('Paste a JD')
+  await langSeg.getByRole('button', { name: '中文' }).click()
+  // paste-resume path
+  await page.getByTestId('stage-paste-link').click()
+  await page.getByTestId('stage-paste').fill('王五 数据分析师\n数元科技 2021.03-至今 搭建经营看板、负责 AB 实验\n技能：SQL')
+  await page.getByTestId('stage-parse').click()
+  // parsed resume landed on the canvas thumbnail + vault seeded, interview starts
+  await expect(page.getByTestId('stage-question')).toContainText('经营看板', { timeout: 10_000 })
+  await page.getByTestId('stage-exit').click()
+  await expect(page.locator('.preview .page')).toContainText('数元科技')
+  await expect(page.getByTestId('vault-btn')).toContainText('1')
+})
+
+test('interview session is continuous across close and reload', async ({ page }) => {
+  let calls = 0
+  await page.route('**/api/ai/**', route => {
+    calls += 1
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: `问题 ${calls}` } }] }),
+    })
+  })
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('stage-btn').click()
+  await page.getByTestId('stage-start').click() // no JD, start talking
+  await expect(page.getByTestId('stage-question')).toContainText('问题 1')
+  await page.getByTestId('stage-input').fill('我做过一个后台系统')
+  await page.getByTestId('stage-input').press('Enter')
+  await expect(page.getByTestId('stage-question')).toContainText('问题 2')
+  const before = calls
+  // close the stage, reload the app, reopen: conversation resumes in place
+  await page.getByTestId('stage-exit').click()
+  await page.reload()
+  await page.getByTestId('stage-btn').click()
+  await expect(page.getByTestId('stage-question')).toContainText('问题 2')
+  expect(calls).toBe(before) // restored, not re-asked
 })

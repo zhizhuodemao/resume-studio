@@ -1,6 +1,6 @@
 import { uid, emptyResume, DEFAULT_SECTION_ORDER } from './sampleData.js'
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 export const STORAGE_KEY = 'resume-studio-v2'
 export const LEGACY_STORAGE_KEY = 'resume-studio-v1'
 
@@ -132,19 +132,107 @@ function normalizePage(p) {
 const looksLikeResume = r => Boolean(r && typeof r === 'object' && r.basics && typeof r.basics === 'object')
 
 // Accepts any historical persisted shape and returns a v2 state, or null.
+/* ---------- Vault (素材库): user-level asset, sibling of resumes ---------- */
+
+let storySeq = 0
+export function makeStory(partial = {}) {
+  return normalizeStory({ id: `st-${Date.now().toString(36)}-${storySeq++}`, ...partial })
+}
+
+export function normalizeStory(st) {
+  const str = v => (typeof v === 'string' ? v : '')
+  const arr = v => (Array.isArray(v) ? v : [])
+  const star = st?.star && typeof st.star === 'object' ? st.star : {}
+  const story = {
+    id: str(st?.id) || `st-${Date.now().toString(36)}-${storySeq++}`,
+    title: str(st?.title),
+    star: { s: str(star.s), t: str(star.t), a: str(star.a), r: str(star.r) },
+    metrics: arr(st?.metrics).filter(m => typeof m === 'string' && m.trim()),
+    skills: arr(st?.skills).filter(x => typeof x === 'string' && x.trim()),
+    source: st?.source === 'imported' ? 'imported' : 'interview',
+    sources: arr(st?.sources)
+      .filter(x => x && typeof x === 'object')
+      .map(x => ({ q: str(x.q), quote: str(x.quote), at: str(x.at) })),
+    askedFollowups: arr(st?.askedFollowups).filter(x => typeof x === 'string'),
+    refusals: arr(st?.refusals).filter(x => typeof x === 'string'),
+  }
+  story.strength = storyStrength(story)
+  return story
+}
+
+// 成色由内容决定，不由声明决定：stub=只有一句话；weak=有内容缺数字；strong=内容+数字
+export function storyStrength(story) {
+  const body = [story.star.s, story.star.t, story.star.a, story.star.r].join('')
+  const hasBody = body.length >= 12 // 中文信息密度高，一句实话就够身体
+  const hasMetric = story.metrics.length > 0 || /\d/.test(story.star.r)
+  if (hasBody && hasMetric) return 'strong'
+  if (hasBody || story.title) return hasBody ? 'weak' : 'stub'
+  return 'stub'
+}
+
+export function normalizeVault(vault) {
+  const stories = Array.isArray(vault?.stories) ? vault.stories.map(normalizeStory) : []
+  return { stories }
+}
+
+// 旧简历反解：经历/项目要点 → stub 故事（升级迁移时执行一次）
+export function vaultFromResumes(resumes) {
+  const stories = []
+  const seen = new Set()
+  for (const doc of resumes) {
+    const r = doc.resume
+    for (const e of r.experience || []) {
+      const title = [e.role, e.company].filter(Boolean).join(' @ ')
+      if (!title || seen.has(title)) continue
+      seen.add(title)
+      stories.push(
+        makeStory({
+          title,
+          star: { s: '', t: '', a: (e.highlights || '').trim(), r: '' },
+          source: 'imported',
+        }),
+      )
+    }
+    for (const pj of r.projects || []) {
+      const title = (pj.name || '').trim()
+      if (!title || seen.has(title)) continue
+      seen.add(title)
+      stories.push(
+        makeStory({ title, star: { s: '', t: '', a: (pj.description || '').trim(), r: '' }, source: 'imported' }),
+      )
+    }
+  }
+  return { stories }
+}
+
 export function migrate(raw) {
   if (!raw || typeof raw !== 'object') return null
 
-  // v2: { version: 2, lang, activeId, resumes: [...] }
+  // v3: { version: 3, lang, activeId, resumes, vault }
+  if (raw.version === 3 && Array.isArray(raw.resumes)) {
+    const resumes = raw.resumes.filter(d => looksLikeResume(d?.resume)).map(normalizeDoc)
+    if (!resumes.length) return null
+    const activeId = resumes.some(d => d.id === raw.activeId) ? raw.activeId : resumes[0].id
+    return {
+      version: 3,
+      lang: raw.lang === 'en' ? 'en' : 'zh',
+      activeId,
+      resumes,
+      vault: normalizeVault(raw.vault),
+    }
+  }
+
+  // v2 → v3: add vault, reverse-parse existing resumes into stub stories
   if (raw.version === 2 && Array.isArray(raw.resumes)) {
     const resumes = raw.resumes.filter(d => looksLikeResume(d?.resume)).map(normalizeDoc)
     if (!resumes.length) return null
     const activeId = resumes.some(d => d.id === raw.activeId) ? raw.activeId : resumes[0].id
     return {
-      version: 2,
+      version: 3,
       lang: raw.lang === 'en' ? 'en' : 'zh',
       activeId,
       resumes,
+      vault: vaultFromResumes(resumes),
     }
   }
 
@@ -158,7 +246,13 @@ export function migrate(raw) {
       typography: raw.typography,
       resume: raw.resume,
     })
-    return { version: 2, lang: raw.lang === 'en' ? 'en' : 'zh', activeId: doc.id, resumes: [doc] }
+    return {
+      version: 3,
+      lang: raw.lang === 'en' ? 'en' : 'zh',
+      activeId: doc.id,
+      resumes: [doc],
+      vault: vaultFromResumes([doc]),
+    }
   }
 
   return null

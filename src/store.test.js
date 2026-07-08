@@ -22,7 +22,7 @@ const v1State = {
 describe('migrate', () => {
   it('wraps a v1 state into a v2 single-doc state', () => {
     const out = migrate(v1State)
-    expect(out.version).toBe(2)
+    expect(out.version).toBe(3)
     expect(out.lang).toBe('zh')
     expect(out.resumes).toHaveLength(1)
     const doc = out.resumes[0]

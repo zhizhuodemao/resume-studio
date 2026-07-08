@@ -16,12 +16,15 @@ import Onboarding from './components/Onboarding.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import AppearancePanel from './components/AppearancePanel.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
-import { translateResume, tailorResume } from './ai.js'
+import { translateResume, tailorResume, parseResumeText } from './ai.js'
 import { downloadDocx, downloadText } from './exporters.js'
 import * as api from './api.js'
 import AccountModal from './components/AccountModal.jsx'
 import { applyCommandAction } from './commander.js'
 import { runAgentLoop } from './assistant.js'
+import { applyStoryUpsert } from './vault.js'
+import { vaultFromResumes, normalizeResume } from './store.js'
+import Stage from './components/Stage.jsx'
 import { diffDocs } from './diff.js'
 import Assistant from './components/Assistant.jsx'
 
@@ -38,7 +41,7 @@ function initialState() {
       template: 'modern',
       track: 'tech',
     })
-    state = { version: 2, lang, activeId: doc.id, resumes: [doc] }
+    state = { version: 3, lang, activeId: doc.id, resumes: [doc], vault: { stories: [] } }
   }
 
   // Optional URL overrides apply to the active document,
@@ -106,7 +109,7 @@ export default function App() {
   const [refineTab, setRefineTab] = useState('content')
   const [mobileView, setMobileView] = useState('edit')
   const [refineOpen, setRefineOpen] = useState(false)
-  const [pendingJd, setPendingJd] = useState(null)
+  const [stageOpen, setStageOpen] = useState(false)
   const [authUser, setAuthUser] = useState(null)
   const [loginOpen, setLoginOpen] = useState(false)
   const [dialog, setDialog] = useState(null) // { message, danger, alertOnly, resolve }
@@ -263,6 +266,10 @@ export default function App() {
         d.id === s.activeId ? { ...d, ...partial, updatedAt: new Date().toISOString() } : d,
       ),
     }))
+  }, [])
+
+  const patchVault = useCallback(vault => {
+    setState(s => ({ ...s, vault }))
   }, [])
 
   /* ---------- Undo / redo ---------- */
@@ -518,6 +525,24 @@ export default function App() {
 
       const execute = async ({ name, args }) => {
         const actionId = `a${seq++}`
+        if (name === 'upsert_story') {
+          const res = applyStoryUpsert(stateRef.current.vault, args)
+          if (!res.saved) return { ok: false, hint: '缺少 title，未保存' }
+          patchVault(res.vault)
+          const detail = t.stage.receipt(res.story.title, res.isNew, (args?.metrics || []).length)
+          callbacks?.onAction?.({
+            id: actionId,
+            label: t.stage.storySaved,
+            status: 'done',
+            receipt: detail,
+          })
+          return {
+            ok: true,
+            changed: ['vault'],
+            story: { id: res.story.id, strength: res.story.strength },
+            hint: res.story.strength === 'strong' ? '素材已完整，可写入简历' : '素材还缺数字或细节',
+          }
+        }
         if (name === 'plan_steps') {
           const steps = (Array.isArray(args?.steps) ? args.steps : []).filter(x => typeof x === 'string' && x.trim())
           if (!steps.length) return { ok: false, hint: 'steps 为空' }
@@ -596,8 +621,10 @@ export default function App() {
       let { message } = await runAgentLoop({
         history,
         getDoc: () => doc,
+        getVault: () => stateRef.current.vault,
         t,
         uiLang: s0.lang,
+        mode: callbacks?.mode || 'assist',
         execute,
         callbacks,
       })
@@ -609,8 +636,10 @@ export default function App() {
         const retry = await runAgentLoop({
           history: [...history, { role: 'assistant', content: message }, { role: 'user', content: t.assistant.actNudge }],
           getDoc: () => doc,
+          getVault: () => stateRef.current.vault,
           t,
           uiLang: s0.lang,
+          mode: callbacks?.mode || 'assist',
           execute,
           callbacks,
         })
@@ -645,6 +674,39 @@ export default function App() {
       return before
     },
     [t, pushHistory, patchDoc],
+  )
+
+  // Stage entry mode "I already have a resume": parse pasted text,
+  // merge into the active doc, seed the vault with stub stories.
+  const handleImportResumeText = useCallback(
+    async text => {
+      const parsed = await parseResumeText(text)
+      const s0 = stateRef.current
+      const doc = s0.resumes.find(d => d.id === s0.activeId)
+      if (!doc) return
+      const merged = normalizeResume({
+        ...doc.resume,
+        basics: { ...doc.resume.basics, ...(parsed.basics || {}) },
+        experience: (parsed.experience || []).map((e, i) => ({ id: `imp-e${i}`, location: '', start: '', end: '', ...e })),
+        projects: (parsed.projects || []).map((p, i) => ({ id: `imp-p${i}`, role: '', link: '', ...p })),
+        education: (parsed.education || []).map((e, i) => ({ id: `imp-d${i}`, major: '', start: '', end: '', description: '', ...e })),
+        skills: (parsed.skills || []).map((sk, i) => ({ id: `imp-s${i}`, level: 3, detail: '', ...sk })),
+      })
+      pushHistory(s0.activeId, doc.resume)
+      patchDoc({ resume: merged })
+      // seed vault stubs from the imported entries (dedup by title)
+      const seeded = vaultFromResumes([{ ...doc, resume: merged }])
+      const existing = new Set(s0.vault.stories.map(st => st.title))
+      const additions = seeded.stories.filter(st => !existing.has(st.title))
+      if (additions.length) patchVault({ stories: [...s0.vault.stories, ...additions] })
+      window.dispatchEvent(new CustomEvent('ai-updated', { detail: { labels: [] } }))
+    },
+    [pushHistory, patchDoc, patchVault],
+  )
+
+  const runInterviewTurn = useCallback(
+    (history, callbacks) => runAssistantTurn(history, { ...callbacks, mode: 'interview' }),
+    [runAssistantTurn],
   )
 
   const handleUndoSnapshot = useCallback(snapshot => patchDoc(snapshot), [patchDoc])
@@ -738,6 +800,7 @@ export default function App() {
           onExport={handleExport}
           refineOpen={refineOpen}
           onToggleRefine={() => setRefineOpen(o => !o)}
+          onOpenStage={() => setStageOpen(true)}
           authUser={authUser}
           onOpenLogin={() => setLoginOpen(true)}
           onLogout={handleLogout}
@@ -747,6 +810,7 @@ export default function App() {
             t={t}
             lang={lang}
             doc={active}
+            vault={state.vault}
             authUser={authUser}
             onRunTurn={runAssistantTurn}
             onUndoSnapshot={handleUndoSnapshot}
@@ -756,8 +820,6 @@ export default function App() {
             reviewMode={reviewMode}
             onToggleReviewMode={toggleReviewMode}
             panelWidth={panelWidth}
-            initialMessage={pendingJd ? t.assistant.jdIntro(pendingJd) : null}
-            onInitialSent={() => setPendingJd(null)}
           />
           <div className="panel-resizer" onMouseDown={startPanelDrag} aria-hidden="true" />
           <Preview
@@ -833,6 +895,20 @@ export default function App() {
         </nav>
       </div>
       {active.page.size === 'letter' && <style>{'@media print { @page { size: letter; margin: 0 } }'}</style>}
+      {stageOpen && active && (
+        <Stage
+          t={t}
+          lang={lang}
+          doc={active}
+          vault={state.vault}
+          onRunTurn={runInterviewTurn}
+          onClose={() => setStageOpen(false)}
+          onSaveJd={jd => patchDoc({ jd, jdReport: null })}
+          onSetLang={next => patch({ lang: next })}
+          onImportResume={handleImportResumeText}
+          resumeNode={resumeNode}
+        />
+      )}
       {dialog && (
         <div className="app-dialog-overlay" role="alertdialog" aria-modal="true" onClick={() => closeDialog(false)}>
           <div className="app-dialog" onClick={e => e.stopPropagation()} data-testid="app-dialog">
@@ -863,11 +939,9 @@ export default function App() {
           onPatch={patch}
           onStart={(tr, stage, jd) => {
             applySample(tr, stage, false)
-            if (jd) {
-              setPendingJd(jd)
-              patchDoc({ jd, jdReport: null })
-            }
+            if (jd) patchDoc({ jd, jdReport: null })
             setOnboarding(false)
+            setStageOpen(true)
           }}
           onSkip={() => setOnboarding(false)}
         />

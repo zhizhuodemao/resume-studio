@@ -64,6 +64,31 @@ export async function polishText(text, { kind = 'highlights', role, company, nam
     .trim()
 }
 
+/* ---------- Paste-in resume parsing (Stage entry, mode: has-resume) ---------- */
+
+// One AI call: free-form resume text → structured resume JSON.
+// Extraction only — the model must not invent or embellish anything.
+export async function parseResumeText(text) {
+  const system =
+    '你是简历解析器。把用户粘贴的简历原文解析成 JSON，只做抽取，绝不补全、改写或编造。' +
+    '输出结构：{"basics":{"name","title","email","phone","location","summary"},' +
+    '"experience":[{"company","role","start","end","location","highlights"}],' +
+    '"projects":[{"name","role","description"}],' +
+    '"education":[{"school","degree","major","start","end","description"}],' +
+    '"skills":[{"name","detail"}]}。' +
+    'highlights/description 为多行文本（每行一条原文要点）。缺失字段留空字符串。只输出 JSON。'
+  const result = await chat(
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: text.slice(0, 6000) },
+    ],
+    { response_format: { type: 'json_object' } },
+  )
+  const parsed = JSON.parse(result)
+  if (!parsed || typeof parsed !== 'object' || !parsed.basics) throw new Error('parse failed')
+  return parsed
+}
+
 /* ---------- Whole-resume translation ---------- */
 
 // Only translatable text fields travel to the model; ids, dates, links,

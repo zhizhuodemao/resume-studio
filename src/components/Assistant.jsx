@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { checkResume } from '../checker.js'
-import { coachCoverage } from '../coverage.js'
+import { vaultStats } from '../vault.js'
 import { matchJD } from '../ai.js'
 import { getGuestQuota } from '../api.js'
 import { renderInline } from '../templates/shared.jsx'
@@ -172,6 +172,7 @@ export default function Assistant({
   t,
   lang,
   doc,
+  vault,
   authUser,
   onRunTurn,
   onUndoSnapshot,
@@ -193,8 +194,8 @@ export default function Assistant({
   const lastUserRef = useRef('')
 
   const report = useMemo(() => checkResume(doc.resume, lang), [doc.resume, lang])
-  const coverage = useMemo(() => coachCoverage(doc.resume, lang), [doc.resume, lang])
-  const [showCoverage, setShowCoverage] = useState(false)
+  const vstats = useMemo(() => vaultStats(vault || { stories: [] }), [vault])
+  const [showVault, setShowVault] = useState(false)
   const [showJd, setShowJd] = useState(false)
   const [jdDraft, setJdDraft] = useState(doc.jd || '')
   const [jdBusy, setJdBusy] = useState(false)
@@ -417,14 +418,13 @@ export default function Assistant({
           )}
         </button>
         <button
-          className={`strip-seg ${showCoverage ? 'open' : ''}`}
-          data-testid="coverage-btn"
-          onClick={() => setShowCoverage(v => !v)}
+          className={`strip-seg ${showVault ? 'open' : ''}`}
+          data-testid="vault-btn"
+          onClick={() => setShowVault(v => !v)}
         >
-          <span className="strip-label">{t.strip.coach}</span>
-          <span className="strip-value">
-            {coverage.filter(a => a.status === 'good').length}/{coverage.length}
-          </span>
+          <span className="strip-label">{t.strip.vault}</span>
+          <span className="strip-value">{vstats.total}</span>
+          {vstats.metrics > 0 && <span className="strip-sub">{t.strip.metrics(vstats.metrics)}</span>}
         </button>
         <button
           className={`strip-seg ${showJd ? 'open' : ''} ${doc.jd ? 'strip-seg-set' : ''}`}
@@ -444,21 +444,17 @@ export default function Assistant({
           <button onClick={() => window.dispatchEvent(new CustomEvent('open-login'))}>{t.account.login}</button>
         </div>
       )}
-      {showCoverage && (
-        <div className="assistant-findings coverage-panel" data-testid="coverage-panel">
-          {coverage.map(a => (
-            <button
-              key={a.key}
-              className={`coverage-row status-${a.status}`}
-              onClick={() => {
-                setInput(t.coach.askAbout(a.label))
-                inputRef.current?.focus()
-              }}
-            >
+      {showVault && (
+        <div className="assistant-findings vault-panel" data-testid="vault-panel">
+          {(vault?.stories || []).length === 0 && <div className="vault-empty">{t.strip.vaultEmpty}</div>}
+          {(vault?.stories || []).map(st => (
+            <div key={st.id} className={`vault-row strength-${st.strength}`}>
               <span className="coverage-dot" />
-              <span className="coverage-label">{a.label}</span>
-              <span className="coverage-hint">{a.hint}</span>
-            </button>
+              <span className="vault-title">{st.title}</span>
+              <span className="vault-meta">
+                {st.metrics.length > 0 ? t.strip.metrics(st.metrics.length) : t.strip[st.strength]}
+              </span>
+            </div>
           ))}
         </div>
       )}

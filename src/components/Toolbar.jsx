@@ -51,6 +51,7 @@ export default function Toolbar({
   onExport,
   refineOpen,
   onToggleRefine,
+  onOpenStage,
   authUser,
   onOpenLogin,
   onLogout,
@@ -189,6 +190,9 @@ export default function Toolbar({
           <Icon name="redo" size={15} />
         </button>
         <span className="toolbar-group-divider" />
+        <button className="btn btn-toolgroup stage-btn" onClick={onOpenStage} data-testid="stage-btn">
+          <span className="cmd-spark">✦</span> {t.stage.open}
+        </button>
         <button
           className={`btn btn-toolgroup ${refineOpen ? 'open' : ''}`}
           onClick={onToggleRefine}

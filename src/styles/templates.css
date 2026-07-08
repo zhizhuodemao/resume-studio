@@ -1,0 +1,1449 @@
+/* ================= Shared resume primitives ================= */
+.resume {
+  --accent: #2563eb;
+  /* Typography controls, overridden by the size / density classes below */
+  --ts: 1; /* font-size scale */
+  --lh: 1.62; /* body line-height */
+  --sp: 1; /* vertical spacing scale */
+  width: 100%;
+  min-height: inherit;
+  text-rendering: optimizeLegibility;
+}
+
+.resume.size-s {
+  --ts: 0.93;
+}
+
+.resume.size-l {
+  --ts: 1.08;
+}
+
+.resume.density-compact {
+  --lh: 1.45;
+  --sp: 0.72;
+}
+
+.resume.density-relaxed {
+  --lh: 1.82;
+  --sp: 1.32;
+}
+
+.r-para {
+  font-size: calc(12.5px * var(--ts));
+  line-height: var(--lh);
+  margin: 0 0 4px;
+  white-space: pre-line;
+}
+
+.r-bullets {
+  margin: 3px 0 6px;
+  padding-left: 17px;
+}
+
+.r-bullets li {
+  font-size: calc(12.5px * var(--ts));
+  line-height: var(--lh);
+  margin: calc(2.5px * var(--sp)) 0;
+}
+
+.r-contacts {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.r-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Keep logical units intact across page breaks */
+.c-entry,
+.m-entry,
+.s-entry,
+.mn-entry,
+.cp-entry,
+.tl-entry,
+.d-entry,
+.b-entry,
+.c-skill,
+.m-skill,
+.s-skill,
+.mn-skill,
+.cp-skill,
+.tl-skill,
+.d-skill,
+.b-skill,
+.s-edu,
+.d-edu {
+  break-inside: avoid;
+}
+
+.c-heading,
+.m-heading,
+.s-heading,
+.s-side-heading,
+.mn-label,
+.cp-heading,
+.tl-heading,
+.d-heading,
+.d-side-heading,
+.b-heading {
+  break-after: avoid;
+}
+
+/* ================= Classic ================= */
+.tpl-classic {
+  font-family: Georgia, 'Times New Roman', 'Songti SC', STSong, SimSun, serif;
+  color: #1d1f23;
+}
+
+.c-root {
+  padding: 54px 60px;
+}
+
+.c-header {
+  position: relative;
+  text-align: center;
+  margin-bottom: calc(26px * var(--sp));
+}
+
+.c-header::after {
+  content: '';
+  display: block;
+  width: 44px;
+  height: 2px;
+  background: var(--accent);
+  margin: 14px auto 0;
+}
+
+.c-photo {
+  position: absolute;
+  right: 0;
+  top: 2px;
+  width: 74px;
+  height: 98px;
+  object-fit: cover;
+  border: 1px solid #d8d8d8;
+}
+
+.c-name {
+  font-size: calc(30px * var(--ts));
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.c-title {
+  font-size: calc(13px * var(--ts));
+  color: #43474e;
+  letter-spacing: 0.12em;
+  margin-top: 7px;
+}
+
+.c-contacts {
+  justify-content: center;
+  font-size: calc(11.5px * var(--ts));
+  color: #4c5058;
+  margin-top: 10px;
+  row-gap: 4px;
+}
+
+.c-contacts .r-contact:not(:last-child)::after {
+  content: '·';
+  margin: 0 10px;
+  color: #a9adb5;
+}
+
+.c-section {
+  margin-bottom: calc(18px * var(--sp));
+}
+
+.c-heading {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #23262b;
+  padding-bottom: 5px;
+  margin: 0 0 calc(11px * var(--sp));
+}
+
+.c-entry {
+  margin-bottom: calc(12px * var(--sp));
+}
+
+.c-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.c-entry-main {
+  min-width: 0;
+}
+
+.c-entry-primary {
+  font-weight: 700;
+  font-size: calc(13.5px * var(--ts));
+}
+
+.c-entry-secondary {
+  font-style: italic;
+  font-size: calc(12.5px * var(--ts));
+  color: #3d4148;
+  margin-left: 9px;
+}
+
+.c-entry-dates {
+  margin-left: auto;
+  font-size: calc(12px * var(--ts));
+  font-style: italic;
+  color: #55595f;
+  white-space: nowrap;
+}
+
+.c-edu-desc {
+  color: #3d4148;
+}
+
+.c-skill {
+  font-size: calc(12.5px * var(--ts));
+  line-height: var(--lh);
+  margin: calc(3px * var(--sp)) 0;
+}
+
+.c-skill-name {
+  font-weight: 700;
+}
+
+.c-skill-detail {
+  color: #3d4148;
+  margin-left: 10px;
+}
+
+.tpl-classic .r-bullets li::marker {
+  color: #7a7e86;
+}
+
+/* ================= Modern ================= */
+.tpl-modern {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #1f2430;
+}
+
+.m-root {
+  padding: 46px 52px;
+}
+
+.m-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding-bottom: calc(20px * var(--sp));
+  border-bottom: 2.5px solid var(--accent);
+}
+
+.m-name {
+  font-size: calc(31px * var(--ts));
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.m-title {
+  font-size: calc(14.5px * var(--ts));
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 5px;
+}
+
+.m-contacts {
+  margin-top: 13px;
+  gap: 6px 18px;
+  font-size: calc(11.5px * var(--ts));
+  color: #565f6e;
+}
+
+.m-contacts svg {
+  color: var(--accent);
+}
+
+.m-photo {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, #ffffff);
+}
+
+.m-section {
+  margin-top: calc(19px * var(--sp));
+}
+
+.m-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: calc(13px * var(--ts));
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  margin: 0 0 calc(10px * var(--sp));
+}
+
+.m-heading::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.m-entry {
+  margin-bottom: calc(13px * var(--sp));
+}
+
+.m-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.m-entry-titles {
+  min-width: 0;
+}
+
+.m-entry-role {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 700;
+}
+
+.m-entry-company {
+  font-size: calc(12.5px * var(--ts));
+  font-weight: 600;
+  color: var(--accent);
+  margin-left: 10px;
+}
+
+.m-entry-meta {
+  margin-left: auto;
+  font-size: calc(11.5px * var(--ts));
+  color: #98a1b0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tpl-modern .r-bullets li::marker {
+  color: var(--accent);
+}
+
+.m-skills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(11px * var(--sp)) 28px;
+}
+
+.m-skill-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.m-skill-name {
+  font-size: calc(12.5px * var(--ts));
+  font-weight: 600;
+}
+
+.m-dots {
+  display: inline-flex;
+  gap: 3.5px;
+}
+
+.m-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e2e5ea;
+}
+
+.m-dots i.on {
+  background: var(--accent);
+}
+
+.m-skill-detail {
+  font-size: calc(11.5px * var(--ts));
+  color: #5b6472;
+  line-height: var(--lh);
+  margin-top: 3px;
+}
+
+/* ================= Sidebar (dark) ================= */
+.tpl-sidebar {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+.s-layout {
+  display: flex;
+  min-height: 1123px;
+  position: relative;
+}
+
+.s-side {
+  width: 238px;
+  flex-shrink: 0;
+  background: color-mix(in oklab, var(--accent) 24%, #161e2a);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 42px 26px;
+  position: relative;
+  z-index: 1;
+}
+
+.s-side-print-bg {
+  display: none;
+}
+
+.s-photo {
+  display: block;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 28px;
+  border: 3px solid rgba(255, 255, 255, 0.28);
+}
+
+.s-side-section {
+  margin-bottom: calc(26px * var(--sp));
+  break-inside: avoid;
+}
+
+.s-side-heading {
+  font-size: calc(11px * var(--ts));
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  padding-bottom: 7px;
+  margin: 0 0 calc(13px * var(--sp));
+}
+
+.s-contact {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: calc(11.5px * var(--ts));
+  line-height: 1.5;
+  margin: calc(8px * var(--sp)) 0;
+  word-break: break-all;
+  color: inherit;
+  text-decoration: none;
+}
+
+.s-contact svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  opacity: 0.72;
+}
+
+.s-skill {
+  margin-bottom: calc(13px * var(--sp));
+}
+
+.s-skill-name {
+  font-size: calc(12px * var(--ts));
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.s-skill-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+
+.s-skill-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--accent) 55%, #ffffff);
+}
+
+.s-skill-detail {
+  font-size: calc(10.5px * var(--ts));
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.5;
+  margin-top: 5px;
+}
+
+.s-edu {
+  margin-bottom: calc(15px * var(--sp));
+}
+
+.s-edu-school {
+  font-size: calc(12.5px * var(--ts));
+  font-weight: 700;
+}
+
+.s-edu-degree {
+  font-size: calc(11.5px * var(--ts));
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 2px;
+}
+
+.s-edu-dates {
+  font-size: calc(10.5px * var(--ts));
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
+}
+
+.s-edu-desc {
+  font-size: calc(10.5px * var(--ts));
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.55;
+  margin-top: 4px;
+}
+
+.s-main {
+  flex: 1;
+  min-width: 0;
+  padding: 46px 42px;
+  color: #222834;
+}
+
+.s-header {
+  padding-bottom: calc(17px * var(--sp));
+  margin-bottom: calc(20px * var(--sp));
+  border-bottom: 1px solid #e7eaf0;
+}
+
+.s-name {
+  font-size: calc(30px * var(--ts));
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.s-title {
+  font-size: calc(14px * var(--ts));
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 5px;
+}
+
+.s-section {
+  margin-bottom: calc(19px * var(--sp));
+}
+
+.s-heading {
+  font-size: calc(13px * var(--ts));
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0 0 calc(12px * var(--sp));
+  padding-bottom: 7px;
+  position: relative;
+}
+
+.s-heading::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 26px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.s-entry {
+  margin-bottom: calc(13px * var(--sp));
+}
+
+.s-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.s-entry-titles {
+  min-width: 0;
+}
+
+.s-entry-role {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 700;
+}
+
+.s-entry-company {
+  font-size: calc(12px * var(--ts));
+  font-weight: 500;
+  color: #6a7383;
+  margin-left: 10px;
+}
+
+.s-entry-dates {
+  margin-left: auto;
+  font-size: calc(11.5px * var(--ts));
+  color: #98a1b0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tpl-sidebar .r-bullets li::marker {
+  color: var(--accent);
+}
+
+/* ================= Duotone (light sidebar) ================= */
+.tpl-duotone {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #23272f;
+}
+
+.d-layout {
+  display: flex;
+  min-height: 1123px;
+  position: relative;
+}
+
+.d-side {
+  width: 234px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--accent) 5%, #f4f5f7);
+  padding: 44px 26px;
+  position: relative;
+  z-index: 1;
+}
+
+.d-side-print-bg {
+  display: none;
+}
+
+.d-photo {
+  display: block;
+  width: 106px;
+  height: 106px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 26px;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 5px color-mix(in srgb, var(--accent) 45%, #fff);
+}
+
+.d-side-section {
+  margin-bottom: calc(26px * var(--sp));
+  break-inside: avoid;
+}
+
+.d-side-heading {
+  font-size: calc(10.5px * var(--ts));
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 80%, #1c2230);
+  border-bottom: 1px solid #dfe2e9;
+  padding-bottom: 7px;
+  margin: 0 0 calc(13px * var(--sp));
+}
+
+.d-contact {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: calc(11.5px * var(--ts));
+  line-height: 1.5;
+  margin: calc(8px * var(--sp)) 0;
+  word-break: break-all;
+  color: #454c59;
+  text-decoration: none;
+}
+
+.d-contact svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: color-mix(in srgb, var(--accent) 70%, #454c59);
+}
+
+.d-skill {
+  margin-bottom: calc(13px * var(--sp));
+}
+
+.d-skill-name {
+  font-size: calc(12px * var(--ts));
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.d-skill-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: #e2e5eb;
+  overflow: hidden;
+}
+
+.d-skill-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.d-skill-detail {
+  font-size: calc(10.5px * var(--ts));
+  color: #767e8b;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+
+.d-edu {
+  margin-bottom: calc(15px * var(--sp));
+}
+
+.d-edu-school {
+  font-size: calc(12.5px * var(--ts));
+  font-weight: 700;
+}
+
+.d-edu-degree {
+  font-size: calc(11.5px * var(--ts));
+  color: #545c69;
+  margin-top: 2px;
+}
+
+.d-edu-dates {
+  font-size: calc(10.5px * var(--ts));
+  color: #8b93a1;
+  margin-top: 2px;
+}
+
+.d-edu-desc {
+  font-size: calc(10.5px * var(--ts));
+  color: #767e8b;
+  line-height: 1.55;
+  margin-top: 4px;
+}
+
+.d-main {
+  flex: 1;
+  min-width: 0;
+  padding: 48px 42px;
+}
+
+.d-header {
+  padding-bottom: calc(18px * var(--sp));
+  margin-bottom: calc(20px * var(--sp));
+  border-bottom: 1px solid #e7eaf0;
+}
+
+.d-name {
+  font-family: Georgia, 'Times New Roman', 'Songti SC', STSong, serif;
+  font-size: calc(31px * var(--ts));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.d-title {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  margin-top: 6px;
+}
+
+.d-section {
+  margin-bottom: calc(19px * var(--sp));
+}
+
+.d-heading {
+  font-size: calc(12px * var(--ts));
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 85%, #1c2230);
+  border-bottom: 1px solid #eceef2;
+  padding-bottom: 6px;
+  margin: 0 0 calc(11px * var(--sp));
+}
+
+.d-entry {
+  margin-bottom: calc(13px * var(--sp));
+}
+
+.d-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.d-entry-titles {
+  min-width: 0;
+}
+
+.d-entry-role {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 700;
+}
+
+.d-entry-company {
+  font-size: calc(12px * var(--ts));
+  color: #6a7383;
+  margin-left: 10px;
+}
+
+.d-entry-dates {
+  margin-left: auto;
+  font-size: calc(11.5px * var(--ts));
+  color: #98a1b0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tpl-duotone .r-bullets li::marker {
+  color: var(--accent);
+}
+
+/* ================= Minimal ================= */
+.tpl-minimal {
+  font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #17191d;
+}
+
+.mn-root {
+  padding: 58px 58px 48px;
+}
+
+.mn-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: calc(34px * var(--sp));
+}
+
+.mn-name {
+  font-size: calc(34px * var(--ts));
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.mn-name::after {
+  content: '.';
+  color: var(--accent);
+}
+
+.mn-title {
+  font-size: calc(13px * var(--ts));
+  color: #6a7078;
+  letter-spacing: 0.05em;
+  margin-top: 8px;
+}
+
+.mn-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  font-size: calc(11px * var(--ts));
+  color: #6a7078;
+  row-gap: 4px;
+}
+
+.mn-contacts span:not(:last-child)::after {
+  content: '/';
+  margin: 0 10px;
+  color: #c6cbd2;
+}
+
+.mn-photo {
+  width: 62px;
+  height: 62px;
+  border-radius: 10px;
+  object-fit: cover;
+  filter: grayscale(100%);
+  flex-shrink: 0;
+}
+
+.mn-section {
+  display: grid;
+  grid-template-columns: 136px 1fr;
+  column-gap: 22px;
+  border-top: 1px solid #e8eaee;
+  padding: calc(17px * var(--sp)) 0 calc(8px * var(--sp));
+}
+
+.mn-label {
+  font-size: calc(10.5px * var(--ts));
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: #9aa0a9;
+  margin: 2px 0 0;
+}
+
+.mn-content {
+  min-width: 0;
+}
+
+.mn-entry {
+  margin-bottom: calc(13px * var(--sp));
+}
+
+.mn-entry-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  margin-bottom: 2px;
+}
+
+.mn-entry-primary {
+  font-size: calc(13px * var(--ts));
+  font-weight: 600;
+}
+
+.mn-entry-secondary {
+  font-size: calc(12px * var(--ts));
+  color: #6a7078;
+}
+
+.mn-entry-dates {
+  margin-left: auto;
+  font-size: calc(11px * var(--ts));
+  color: #9aa0a9;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mn-summary {
+  font-size: calc(12.5px * var(--ts));
+}
+
+.mn-desc {
+  color: #6a7078;
+  font-size: calc(12px * var(--ts));
+}
+
+.tpl-minimal .r-bullets {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tpl-minimal .r-bullets li {
+  padding-left: 15px;
+  position: relative;
+}
+
+.tpl-minimal .r-bullets li::before {
+  content: '–';
+  position: absolute;
+  left: 0;
+  color: #9aa0a9;
+}
+
+.mn-skill {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: calc(6px * var(--sp)) 0;
+  font-size: calc(12px * var(--ts));
+}
+
+.mn-skill-name {
+  font-weight: 600;
+  min-width: 128px;
+}
+
+.mn-skill-detail {
+  color: #6a7078;
+}
+
+/* ================= Campus ================= */
+.tpl-campus {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #212734;
+}
+
+.cp-root {
+  padding: 44px 52px;
+}
+
+.cp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 26px;
+  padding-bottom: calc(18px * var(--sp));
+  border-bottom: 1px solid #e9ecf1;
+}
+
+.cp-name {
+  font-size: calc(28px * var(--ts));
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.cp-title {
+  font-size: calc(14px * var(--ts));
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 5px;
+}
+
+.cp-contacts {
+  margin-top: 12px;
+  gap: 6px 16px;
+  font-size: calc(11.5px * var(--ts));
+  color: #5b6472;
+}
+
+.cp-contacts svg {
+  color: var(--accent);
+}
+
+.cp-photo {
+  width: 82px;
+  height: 82px;
+  border-radius: 16px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.cp-section {
+  margin-top: calc(18px * var(--sp));
+}
+
+.cp-heading {
+  display: inline-flex;
+  font-size: calc(12.5px * var(--ts));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--accent) 88%, #000);
+  background: color-mix(in srgb, var(--accent) 10%, #fff);
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin: 0 0 calc(12px * var(--sp));
+}
+
+.cp-entry {
+  margin-bottom: calc(12px * var(--sp));
+}
+
+.cp-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.cp-entry-titles {
+  min-width: 0;
+}
+
+.cp-entry-primary {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 700;
+}
+
+.cp-entry-secondary {
+  font-size: calc(12.5px * var(--ts));
+  font-weight: 600;
+  color: #4a5364;
+  margin-left: 10px;
+}
+
+.cp-entry-meta {
+  margin-left: auto;
+  font-size: calc(11.5px * var(--ts));
+  color: #98a1b0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tpl-campus .r-bullets li::marker {
+  color: var(--accent);
+}
+
+.cp-skill {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: calc(7px * var(--sp)) 0;
+}
+
+.cp-skill-chip {
+  flex-shrink: 0;
+  font-size: calc(11.5px * var(--ts));
+  font-weight: 600;
+  color: color-mix(in srgb, var(--accent) 88%, #000);
+  background: color-mix(in srgb, var(--accent) 10%, #fff);
+  padding: 3px 11px;
+  border-radius: 999px;
+}
+
+.cp-skill-detail {
+  font-size: calc(12px * var(--ts));
+  color: #5b6472;
+  line-height: var(--lh);
+}
+
+/* ================= Timeline ================= */
+.tpl-timeline {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #1f2430;
+}
+
+.tl-root {
+  padding: 46px 54px;
+}
+
+.tl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: calc(16px * var(--sp));
+  margin-bottom: calc(4px * var(--sp));
+  border-bottom: 1px solid #e7eaf0;
+}
+
+.tl-name {
+  font-size: calc(28px * var(--ts));
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.tl-title {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 5px;
+}
+
+.tl-contacts {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  font-size: calc(11px * var(--ts));
+  color: #5b6472;
+  flex-shrink: 0;
+}
+
+.tl-contacts svg {
+  color: #98a1b0;
+}
+
+.tl-section {
+  margin-top: calc(18px * var(--sp));
+}
+
+.tl-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: calc(12.5px * var(--ts));
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0 0 calc(12px * var(--sp));
+}
+
+.tl-heading::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: #fff;
+}
+
+.tl-entry {
+  display: grid;
+  grid-template-columns: 88px 20px 1fr;
+  column-gap: 8px;
+  padding-bottom: calc(13px * var(--sp));
+}
+
+.tl-dates {
+  font-size: calc(11px * var(--ts));
+  color: #98a1b0;
+  text-align: right;
+  padding-top: 3px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.tl-rail {
+  position: relative;
+}
+
+.tl-rail::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #e6e9f0;
+}
+
+.tl-entry:first-child .tl-rail::before {
+  top: 8px;
+}
+
+.tl-entry:last-child .tl-rail::before {
+  bottom: auto;
+  height: 8px;
+}
+
+.tl-entry:only-child .tl-rail::before {
+  display: none;
+}
+
+.tl-rail::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--accent);
+}
+
+.tl-content {
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.tl-entry-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  margin-bottom: 2px;
+}
+
+.tl-entry-primary {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 700;
+}
+
+.tl-entry-secondary {
+  font-size: calc(12px * var(--ts));
+  color: #6a7383;
+}
+
+.tpl-timeline .r-bullets li::marker {
+  color: var(--accent);
+}
+
+.tl-skill {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: calc(6px * var(--sp)) 0;
+  font-size: calc(12.5px * var(--ts));
+}
+
+.tl-skill-name {
+  font-weight: 600;
+  min-width: 130px;
+}
+
+.tl-skill-detail {
+  color: #5b6472;
+}
+
+/* ================= Bold ================= */
+.tpl-bold {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #1f2430;
+}
+
+.b-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  background: var(--accent);
+  color: #fff;
+  padding: 44px 52px 38px;
+}
+
+.b-name {
+  font-size: calc(33px * var(--ts));
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  margin: 0;
+  line-height: 1.12;
+}
+
+.b-title {
+  font-size: calc(14.5px * var(--ts));
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  margin-top: 6px;
+}
+
+.b-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 8px;
+  margin-top: 16px;
+}
+
+.b-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(11px * var(--ts));
+  color: #fff;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+
+.b-photo {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 3px solid rgba(255, 255, 255, 0.45);
+}
+
+.b-body {
+  padding: 30px 52px 44px;
+}
+
+.b-section {
+  margin-top: calc(20px * var(--sp));
+}
+
+.b-section:first-child {
+  margin-top: 0;
+}
+
+.b-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: calc(15px * var(--ts));
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  margin: 0 0 calc(11px * var(--sp));
+}
+
+.b-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #eceef2;
+}
+
+.b-entry {
+  margin-bottom: calc(13px * var(--sp));
+}
+
+.b-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.b-entry-titles {
+  min-width: 0;
+}
+
+.b-entry-role {
+  font-size: calc(13.5px * var(--ts));
+  font-weight: 700;
+}
+
+.b-entry-company {
+  font-size: calc(12.5px * var(--ts));
+  font-weight: 600;
+  color: var(--accent);
+  margin-left: 10px;
+}
+
+.b-entry-meta {
+  margin-left: auto;
+  font-size: calc(11.5px * var(--ts));
+  color: #98a1b0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tpl-bold .r-bullets li::marker {
+  color: var(--accent);
+}
+
+.b-skill {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: calc(7px * var(--sp)) 0;
+}
+
+.b-skill-chip {
+  flex-shrink: 0;
+  font-size: calc(11.5px * var(--ts));
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  padding: 3px 11px;
+  border-radius: 999px;
+}
+
+.b-skill-detail {
+  font-size: calc(12px * var(--ts));
+  color: #5b6472;
+  line-height: var(--lh);
+}
+
+/* ================= Font overrides (user-selected) ================= */
+.resume.font-sans {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+.resume.font-serif {
+  font-family: Georgia, 'Times New Roman', 'Songti SC', STSong, SimSun, serif;
+}
+
+/* Elements with their own display face follow the user's font choice */
+.resume.font-sans .d-name {
+  font-family: inherit;
+}

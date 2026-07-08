@@ -1,0 +1,57 @@
+/* The print-only copy of the resume is hidden on screen */
+#print-root {
+  display: none;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+  }
+
+  .app {
+    display: none !important;
+  }
+
+  #print-root {
+    display: block;
+    width: 210mm;
+  }
+
+  #print-root * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Sidebar templates: repeat the column background on every printed page */
+  #print-root .s-layout,
+  #print-root .d-layout {
+    min-height: auto;
+  }
+
+  #print-root .s-side-print-bg {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 238px;
+    background: color-mix(in oklab, var(--accent) 24%, #161e2a);
+  }
+
+  #print-root .d-side-print-bg {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 234px;
+    background: color-mix(in srgb, var(--accent) 5%, #f4f5f7);
+  }
+}

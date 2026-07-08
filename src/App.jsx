@@ -7,6 +7,7 @@ import Editor from './components/Editor.jsx'
 import Preview from './components/Preview.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import Resume, { TEMPLATE_IDS, DEFAULT_TYPOGRAPHY } from './templates/Resume.jsx'
+import { translateResume } from './ai.js'
 
 const STORAGE_KEY = 'resume-studio-v1'
 
@@ -119,6 +120,29 @@ export default function App() {
   }
   const handleExport = () => window.print()
 
+  const [translating, setTranslating] = useState(false)
+  const [translateBackup, setTranslateBackup] = useState(null)
+  const handleTranslate = async target => {
+    if (translating) return
+    if (!window.confirm(t.ai.confirmTranslate)) return
+    setTranslating(true)
+    try {
+      const translated = await translateResume(resume, target)
+      setTranslateBackup(resume)
+      setResume(translated)
+    } catch (err) {
+      console.error(err)
+      window.alert(t.ai.error)
+    } finally {
+      setTranslating(false)
+    }
+  }
+  const handleUndoTranslate = () => {
+    if (!translateBackup) return
+    setResume(translateBackup)
+    setTranslateBackup(null)
+  }
+
   const placeholders = useMemo(() => getPlaceholders(track, lang), [track, lang])
 
   const resumeNode = useMemo(
@@ -141,6 +165,10 @@ export default function App() {
           onApplySample={applySample}
           onClear={handleClear}
           onExport={handleExport}
+          onTranslate={handleTranslate}
+          translating={translating}
+          canUndoTranslate={Boolean(translateBackup)}
+          onUndoTranslate={handleUndoTranslate}
         />
         <div className="app-body">
           <Editor t={t} resume={resume} setResume={setResume} placeholders={placeholders} />

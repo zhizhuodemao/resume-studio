@@ -618,6 +618,82 @@ textarea {
   line-height: 1.5;
 }
 
+/* AI assist */
+.ai-assist {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -2px 0 10px;
+}
+
+.ai-btn {
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ai-btn:hover:not(:disabled) {
+  border-color: var(--text-3);
+  color: var(--text);
+}
+
+.ai-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ai-error {
+  font-size: 11.5px;
+  color: var(--danger);
+}
+
+.ai-preview {
+  border: 1px solid #d9e3f8;
+  background: #f6f9ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: -2px 0 10px;
+}
+
+.ai-preview-text {
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-line;
+  color: var(--text);
+  margin-bottom: 9px;
+}
+
+.ai-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-apply {
+  background: var(--ink);
+  color: #fff;
+}
+
+.ai-apply:hover {
+  background: #000;
+  color: #fff;
+}
+
+.popover-ai {
+  padding: 12px 14px;
+  width: 260px;
+}
+
+.ai-translate-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 /* Onboarding */
 .onboard-overlay {
   position: fixed;

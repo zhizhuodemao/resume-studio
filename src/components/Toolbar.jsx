@@ -171,12 +171,17 @@ export default function Toolbar({
   onApplySample,
   onClear,
   onExport,
+  onTranslate,
+  translating,
+  canUndoTranslate,
+  onUndoTranslate,
 }) {
-  // ?menu=template|typo|sample deep-links a panel open
+  // ?menu=template|typo|sample|ai deep-links a panel open
   const initialMenu = new URLSearchParams(window.location.search).get('menu')
   const tplPop = usePopover(initialMenu === 'template')
   const typoPop = usePopover(initialMenu === 'typo')
   const samplePop = usePopover(initialMenu === 'sample')
+  const aiPop = usePopover(initialMenu === 'ai')
   const [selTrack, setSelTrack] = useState(track || 'tech')
   const [selStage, setSelStage] = useState('social')
 
@@ -334,6 +339,45 @@ export default function Toolbar({
             </div>
           )}
         </div>
+        <div className="popover-wrap" ref={aiPop.ref}>
+          <button
+            className={`btn btn-ghost ${aiPop.open ? 'open' : ''}`}
+            disabled={translating}
+            onClick={() => aiPop.setOpen(!aiPop.open)}
+          >
+            {translating ? t.ai.translating : `✨ ${t.ai.translate}`}
+          </button>
+          {aiPop.open && (
+            <div className="popover popover-right popover-ai">
+              <p className="sample-note">{t.ai.translateNote}</p>
+              <div className="ai-translate-actions">
+                <button
+                  className="btn btn-small"
+                  onClick={() => {
+                    aiPop.setOpen(false)
+                    onTranslate('en')
+                  }}
+                >
+                  {t.ai.toEn}
+                </button>
+                <button
+                  className="btn btn-small"
+                  onClick={() => {
+                    aiPop.setOpen(false)
+                    onTranslate('zh')
+                  }}
+                >
+                  {t.ai.toZh}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        {canUndoTranslate && (
+          <button className="btn btn-ghost" onClick={onUndoTranslate}>
+            {t.ai.undoTranslate}
+          </button>
+        )}
         <button className="btn btn-ghost btn-danger" onClick={onClear}>
           {t.clearAll}
         </button>

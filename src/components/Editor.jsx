@@ -1,6 +1,56 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { uid } from '../sampleData.js'
+import { polishText } from '../ai.js'
+
+function AiAssist({ t, getPayload, onApply }) {
+  const [phase, setPhase] = useState('idle') // idle | loading | preview | error
+  const [result, setResult] = useState('')
+
+  const run = async () => {
+    const payload = getPayload()
+    if (!payload.text || !payload.text.trim()) return
+    setPhase('loading')
+    try {
+      setResult(await polishText(payload.text, payload))
+      setPhase('preview')
+    } catch (err) {
+      console.error(err)
+      setPhase('error')
+    }
+  }
+
+  if (phase === 'preview') {
+    return (
+      <div className="ai-preview">
+        <div className="ai-preview-text">{result}</div>
+        <div className="ai-preview-actions">
+          <button
+            className="btn btn-small ai-apply"
+            onClick={() => {
+              onApply(result)
+              setPhase('idle')
+            }}
+          >
+            {t.ai.apply}
+          </button>
+          <button className="btn btn-small" onClick={() => setPhase('idle')}>
+            {t.ai.discard}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="ai-assist">
+      <button type="button" className="ai-btn" onClick={run} disabled={phase === 'loading'}>
+        {phase === 'loading' ? t.ai.polishing : `✨ ${t.ai.polish}`}
+      </button>
+      {phase === 'error' && <span className="ai-error">{t.ai.error}</span>}
+    </div>
+  )
+}
 
 function Field({ label, value, onChange, placeholder, type = 'text' }) {
   return (
@@ -168,6 +218,11 @@ export default function Editor({ t, resume, setResume, placeholders }) {
           rows={5}
           onChange={v => setBasics({ summary: v })}
         />
+        <AiAssist
+          t={t}
+          getPayload={() => ({ text: resume.basics.summary, kind: 'summary', role: resume.basics.title })}
+          onApply={v => setBasics({ summary: v })}
+        />
       </SectionCard>
     ),
 
@@ -197,6 +252,11 @@ export default function Editor({ t, resume, setResume, placeholders }) {
                 placeholder={ph.highlights}
                 rows={5}
                 onChange={v => exp.update(item.id, { highlights: v })}
+              />
+              <AiAssist
+                t={t}
+                getPayload={() => ({ text: item.highlights, kind: 'highlights', role: item.role, company: item.company })}
+                onApply={v => exp.update(item.id, { highlights: v })}
               />
             </div>
           </details>
@@ -229,6 +289,11 @@ export default function Editor({ t, resume, setResume, placeholders }) {
                 placeholder={ph.projectDescription}
                 rows={4}
                 onChange={v => proj.update(item.id, { description: v })}
+              />
+              <AiAssist
+                t={t}
+                getPayload={() => ({ text: item.description, kind: 'project', role: item.role, name: item.name })}
+                onApply={v => proj.update(item.id, { description: v })}
               />
             </div>
           </details>

@@ -16,6 +16,7 @@ export function createApp({
   upstream = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
   jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-me-in-production',
   tokenLimit = process.env.AI_TOKEN_LIMIT ? Number(process.env.AI_TOKEN_LIMIT) : null,
+  guestDailyCalls = process.env.GUEST_DAILY_CALLS !== undefined ? Number(process.env.GUEST_DAILY_CALLS) : 5,
   staticDir = 'dist',
 } = {}) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true })
@@ -44,7 +45,18 @@ export function createApp({
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_usage_user_time ON usage_log(user_id, created_at);
+    CREATE TABLE IF NOT EXISTS guest_usage (
+      ip TEXT NOT NULL,
+      day TEXT NOT NULL,
+      calls INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (ip, day)
+    );
   `)
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
+  } catch {
+    /* column already exists */
+  }
 
   const now = () => new Date().toISOString()
   const hashPassword = (password, salt) => crypto.scryptSync(password, salt, 64).toString('hex')
@@ -66,6 +78,21 @@ export function createApp({
     } catch {
       res.status(401).json({ error: 'auth_required' })
     }
+  }
+
+  const optionalAuth = (req, _res, next) => {
+    const header = req.headers.authorization || ''
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null
+    if (token) {
+      try {
+        const payload = jwt.verify(token, jwtSecret)
+        req.userId = payload.uid
+        req.userEmail = payload.email
+      } catch {
+        /* treat as guest */
+      }
+    }
+    next()
   }
 
   /* ---------- naive login rate limiter ---------- */
@@ -124,7 +151,8 @@ export function createApp({
   }
 
   app.get('/api/auth/me', auth, (req, res) => {
-    res.json({ user: { email: req.userEmail }, usage: usageSummary(req.userId) })
+    const row = db.prepare('SELECT plan FROM users WHERE id = ?').get(req.userId)
+    res.json({ user: { email: req.userEmail, plan: row?.plan || 'free' }, usage: usageSummary(req.userId) })
   })
 
   app.get('/api/usage', auth, (req, res) => res.json(usageSummary(req.userId)))
@@ -150,9 +178,23 @@ export function createApp({
     res.json({ ok: true, updated_at: now() })
   })
 
-  /* ---------- metered AI proxy (login required) ---------- */
+  /* ---------- guest trial (per-IP daily) ---------- */
+  const today = () => new Date().toISOString().slice(0, 10)
+  const guestCalls = ip =>
+    Number(db.prepare('SELECT calls FROM guest_usage WHERE ip = ? AND day = ?').get(ip, today())?.calls || 0)
+  const bumpGuest = ip =>
+    db.prepare(
+      `INSERT INTO guest_usage(ip, day, calls) VALUES (?,?,1)
+       ON CONFLICT(ip, day) DO UPDATE SET calls = calls + 1`,
+    ).run(ip, today())
+
+  app.get('/api/guest-quota', (req, res) => {
+    res.json({ remaining: Math.max(0, guestDailyCalls - guestCalls(req.ip)), daily: guestDailyCalls })
+  })
+
+  /* ---------- metered AI proxy (login or guest trial) ---------- */
   const recordUsage = (userId, endpoint, model, usage) => {
-    if (!usage) return
+    if (!usage || !userId) return
     db.prepare(
       'INSERT INTO usage_log(user_id, endpoint, model, tokens_prompt, tokens_completion, tokens_total, created_at) VALUES (?,?,?,?,?,?,?)',
     ).run(
@@ -183,15 +225,24 @@ export function createApp({
     return usage
   }
 
-  app.post(/^\/api\/ai\/(.+)$/, auth, async (req, res) => {
+  app.post(/^\/api\/ai\/(.+)$/, optionalAuth, async (req, res) => {
     const aiPath = req.params[0]
     if (!/^[\w/-]+$/.test(aiPath)) return res.status(400).json({ error: 'bad_path' })
     const key = process.env.DEEPSEEK_API_KEY
     if (!key) return res.status(500).json({ error: 'ai_not_configured' })
 
-    if (tokenLimit) {
-      const { total_tokens } = usageSummary(req.userId)
-      if (total_tokens >= tokenLimit) return res.status(429).json({ error: 'quota_exceeded' })
+    if (!req.userId) {
+      // guest trial: N calls per IP per day, no account needed
+      if (guestDailyCalls <= 0 || guestCalls(req.ip) >= guestDailyCalls) {
+        return res.status(429).json({ error: 'guest_trial_exhausted' })
+      }
+      bumpGuest(req.ip)
+    } else if (tokenLimit) {
+      const plan = db.prepare('SELECT plan FROM users WHERE id = ?').get(req.userId)?.plan
+      if (plan !== 'pro') {
+        const { total_tokens } = usageSummary(req.userId)
+        if (total_tokens >= tokenLimit) return res.status(429).json({ error: 'quota_exceeded' })
+      }
     }
 
     const body = req.body && typeof req.body === 'object' ? { ...req.body } : {}

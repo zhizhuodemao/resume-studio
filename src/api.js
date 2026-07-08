@@ -47,4 +47,5 @@ export const me = () => req('/api/auth/me')
 export const getUsage = () => req('/api/usage')
 export const pullState = () => req('/api/sync')
 export const pushState = state => req('/api/sync', { method: 'PUT', body: { state } })
+export const getGuestQuota = () => req('/api/guest-quota')
 export const logout = clearToken

@@ -64,7 +64,10 @@ export async function chatStream(body, { onDelta, onToolCall, signal } = {}) {
     const errBody = await res.text().catch(() => '')
     const err = new Error(`AI request failed: ${res.status} ${errBody.slice(0, 200)}`)
     if (res.status === 401) err.code = 'auth_required'
-    if (res.status === 429) err.code = errBody.includes('quota_exceeded') ? 'quota_exceeded' : err.code
+    if (res.status === 429) {
+      if (errBody.includes('guest_trial_exhausted')) err.code = 'guest_trial_exhausted'
+      else if (errBody.includes('quota_exceeded')) err.code = 'quota_exceeded'
+    }
     throw err
   }
 

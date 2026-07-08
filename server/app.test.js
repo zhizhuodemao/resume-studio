@@ -84,10 +84,9 @@ describe('auth', () => {
     expect((await meRes.json()).user.email).toBe('a@test.dev')
   })
 
-  it('rejects unauthenticated access to protected routes', async () => {
+  it('rejects unauthenticated access to protected routes (AI allows guest trial)', async () => {
     expect((await get('/api/sync')).status).toBe(401)
     expect((await get('/api/usage')).status).toBe(401)
-    expect((await post('/api/ai/chat/completions', { model: 'x' })).status).toBe(401)
   })
 })
 
@@ -139,5 +138,38 @@ describe('metered AI proxy', () => {
     const r3 = await post('/api/ai/chat/completions', { model: 'deepseek-chat', messages: [] }, token)
     expect(r3.status).toBe(429)
     expect((await r3.json()).error).toBe('quota_exceeded')
+  })
+})
+
+describe('guest trial and plans', () => {
+  it('allows unauthenticated calls up to the daily cap, then blocks', async () => {
+    // consume whatever guest quota remains (cap defaults to 5 per IP per day)
+    const { remaining } = await (await get('/api/guest-quota')).json()
+    expect(remaining).toBeGreaterThan(0)
+    let last
+    for (let i = 0; i < remaining; i++) last = await post('/api/ai/chat/completions', { model: 'x', messages: [] })
+    expect(last.status).toBe(200)
+    const blocked = await post('/api/ai/chat/completions', { model: 'x', messages: [] })
+    expect(blocked.status).toBe(429)
+    expect((await blocked.json()).error).toBe('guest_trial_exhausted')
+    const q = await (await get('/api/guest-quota')).json()
+    expect(q.remaining).toBe(0)
+  })
+
+  it('pro plan bypasses the token limit', async () => {
+    const { token } = await (await post('/api/auth/register', { email: 'pro@test.dev', password: 'secret1' })).json()
+    // burn past the 150-token limit
+    await post('/api/ai/chat/completions', { model: 'x', messages: [] }, token) // 60
+    await post('/api/ai/chat/completions', { model: 'x', messages: [] }, token) // 120
+    await post('/api/ai/chat/completions', { model: 'x', messages: [] }, token) // 180 > 150
+    expect((await post('/api/ai/chat/completions', { model: 'x', messages: [] }, token)).status).toBe(429)
+    // upgrade to pro → unlimited
+    const { createApp: _ } = await import('./app.js')
+    const { DatabaseSync } = await import('node:sqlite')
+    const path = await import('node:path')
+    const db = new DatabaseSync(path.join(tmpDir, 'test.db'))
+    db.exec("UPDATE users SET plan = 'pro' WHERE email = 'pro@test.dev'")
+    db.close()
+    expect((await post('/api/ai/chat/completions', { model: 'x', messages: [] }, token)).status).toBe(200)
   })
 })

@@ -24,9 +24,10 @@ test('editing a field updates the live preview', async ({ page }) => {
   await expect(page.locator('.page')).toContainText('端到端测试员')
 })
 
-test('switching template re-renders the preview', async ({ page }) => {
+test('switching template via the refine looks tab', async ({ page }) => {
   await page.goto('/?onboarding=0')
-  await page.getByRole('button', { name: /^模板/ }).click()
+  await openRefine(page)
+  await page.getByTestId('looks-tab').click()
   await page.getByRole('radio', { name: /极简/ }).click()
   await expect(page.locator('.page .resume.tpl-minimal')).toHaveCount(1)
 })
@@ -143,7 +144,9 @@ test('drag and drop reorders sections', async ({ page }) => {
 })
 
 test('layout controls: paper size, margins and fonts apply', async ({ page }) => {
-  await page.goto('/?onboarding=0&menu=typo')
+  await page.goto('/?onboarding=0')
+  await openRefine(page)
+  await page.getByTestId('looks-tab').click()
   // Letter paper resizes the preview page
   await page.getByRole('button', { name: 'Letter' }).click()
   await expect(page.locator('.preview .page')).toHaveCSS('width', '816px')
@@ -167,46 +170,20 @@ test('fit to one page compresses overflowing content', async ({ page }) => {
   await expect(page.locator('.page-hint')).toContainText('共 2 页')
 })
 
-test('insight drawer: health check scores and findings', async ({ page }) => {
+test('assistant health card: score and findings update live', async ({ page }) => {
   await page.goto('/?onboarding=0')
-  // blank doc → low score with must-fix findings
+  // blank doc → low score with must-fix findings in the ambient card
   await page.getByTestId('doc-switcher').click()
   await page.getByRole('button', { name: '新建空白' }).click()
-  await page.getByTestId('ai-menu-btn').click()
-  await page.getByTestId('insight-btn').click()
-  const drawer = page.getByTestId('insight-drawer')
-  await expect(drawer).toBeVisible()
-  await expect(drawer).toContainText('必须修复')
-  await expect(drawer).toContainText('缺少姓名')
-  // sample resume scores much higher
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant.locator('.assistant-health-text')).toContainText('优化建议')
+  await assistant.locator('.assistant-health').click()
+  await expect(assistant.locator('.assistant-findings')).toContainText('缺少姓名')
+  // sample resume scores much higher (findings shrink or vanish)
   await page.getByTestId('doc-switcher').click()
   await page.locator('.docs-item', { hasText: '我的简历' }).click()
-  await expect(drawer.locator('.score-num')).not.toHaveText(/^([0-5]?\d)$/)
-})
-
-test('JD match analyzes against a mocked AI response', async ({ page }) => {
-  await page.route('**/api/ai/**', route =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
-          score: 72,
-          missing_keywords: ['Kubernetes', '微服务'],
-          strengths: ['React 技术栈深度匹配'],
-          suggestions: ['补充容器化相关经验'],
-        }) } }],
-      }),
-    }),
-  )
-  await page.goto('/?onboarding=0&panel=insight')
-  await page.getByRole('button', { name: 'JD 匹配' }).click()
-  await page.locator('.jd-input').fill('招聘高级前端工程师，要求 React、Kubernetes、微服务经验')
-  await page.getByRole('button', { name: '开始分析' }).click()
-  const drawer = page.getByTestId('insight-drawer')
-  await expect(drawer).toContainText('72')
-  await expect(drawer).toContainText('Kubernetes')
-  await expect(drawer).toContainText('React 技术栈深度匹配')
-  await expect(drawer).toContainText('补充容器化相关经验')
+  const score = await assistant.locator('.assistant-score').textContent()
+  expect(Number(score)).toBeGreaterThan(60)
 })
 
 test('assistant coaches: interview turn writes into the resume', async ({ page }) => {
@@ -236,28 +213,40 @@ test('assistant coaches: interview turn writes into the resume', async ({ page }
   await expect(assistant).toContainText('已撤销')
 })
 
-test('JD tailoring creates and opens a tailored copy', async ({ page }) => {
+test('JD tailoring via assistant tool creates and opens a tailored copy', async ({ page }) => {
   let call = 0
   await page.route('**/api/ai/**', route => {
     call += 1
-    const content =
-      call === 1
-        ? JSON.stringify({ score: 60, missing_keywords: ['K8s'], strengths: [], suggestions: ['突出容器经验'] })
-        : JSON.stringify({
+    if (call === 1) {
+      // assistant turn: user confirms → tool call
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          choices: [{ message: {
+            content: '好的，正在为这个职位生成定制版…',
+            tool_calls: [
+              { id: '1', type: 'function', function: { name: 'create_tailored_version', arguments: JSON.stringify({ jd: '高级前端，要求 React 与 K8s' }) } },
+            ],
+          } }],
+        }),
+      })
+    } else {
+      // tailorResume call
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({
             basics: { name: '陈嘉禾', title: '高级前端工程师', location: '上海', summary: '为该职位定制的简介' },
             experience: [], projects: [], education: [], skills: [],
-          })
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ choices: [{ message: { content } }] }),
-    })
+          }) } }],
+        }),
+      })
+    }
   })
-  await page.goto('/?onboarding=0&panel=insight')
-  await page.getByRole('button', { name: 'JD 匹配' }).click()
-  await page.locator('.jd-input').fill('高级前端，要求 React 与 K8s')
-  await page.getByRole('button', { name: '开始分析' }).click()
-  await page.getByTestId('tailor-btn').click()
-  await expect(page.getByTestId('doc-switcher')).toContainText('定制版')
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('cmd-input').fill('帮我生成这个 JD 的定制版：高级前端，要求 React 与 K8s')
+  await page.getByTestId('cmd-input').press('Enter')
+  await expect(page.getByTestId('doc-switcher')).toContainText('定制版', { timeout: 10_000 })
   await expect(page.locator('.preview .page')).toContainText('为该职位定制的简介')
   // original doc unchanged
   await page.getByTestId('doc-switcher').click()
@@ -321,18 +310,21 @@ test('toolbar fits common laptop widths without horizontal overflow', async ({ p
   }
 })
 
-test('AI menu and more menu expose the consolidated actions', async ({ page }) => {
+test('slim toolbar: looks live in refine, utilities in the overflow menu', async ({ page }) => {
   await page.goto('/?onboarding=0')
-  await page.getByTestId('ai-menu-btn').click()
-  await expect(page.getByTestId('insight-btn')).toBeVisible()
-  await expect(page.getByRole('button', { name: '译成英文' })).toBeVisible()
-  await page.keyboard.press('Escape')
+  // appearance controls are no longer toolbar chrome
+  await expect(page.getByRole('button', { name: /^模板/ })).toHaveCount(0)
+  await expect(page.locator('.toolbar .accent-picker')).toHaveCount(0)
+  await openRefine(page)
+  await page.getByTestId('looks-tab').click()
+  await expect(page.getByTestId('appearance-panel')).toContainText('模板')
+  await expect(page.getByTestId('appearance-panel').locator('.accent-swatch').first()).toBeVisible()
+  // overflow menu keeps sample/clear/language
   await page.getByTestId('more-btn').click()
   await expect(page.getByRole('button', { name: '载入示例' })).toBeVisible()
   await expect(page.getByRole('button', { name: '清空内容' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'EN' })).toBeVisible()
 })
-
 test('assistant executes tool calls and supports per-turn undo', async ({ page }) => {
   await page.route('**/api/ai/**', route =>
     route.fulfill({
@@ -440,14 +432,37 @@ test('account: register, cloud sync roundtrip after wiping local data', async ({
   await expect(page.getByTestId('account-menu-btn')).toBeVisible()
 })
 
-test('AI is gated behind login with a friendly prompt', async ({ page }) => {
-  // no route mock and not logged in → backend returns 401
+test('guest trial exhaustion prompts signup and opens the login modal', async ({ page }) => {
+  await page.route('**/api/ai/**', route =>
+    route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'guest_trial_exhausted' }) }),
+  )
   await page.goto('/?onboarding=0')
   const input = page.getByTestId('cmd-input')
   await input.fill('帮我润色简介')
   await input.press('Enter')
-  const assistant = page.getByTestId('assistant')
-  await expect(assistant).toContainText('AI 功能需要登录后使用')
-  // login modal auto-opened
+  await expect(page.getByTestId('assistant')).toContainText('免费体验次数用完')
   await expect(page.getByTestId('account-submit')).toBeVisible()
+})
+
+test('guest conversion nudge appears after a successful AI edit', async ({ page }) => {
+  await page.route('**/api/ai/chat/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: {
+          content: '已更新。',
+          tool_calls: [
+            { id: '1', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '游客体验的新简介' }) } },
+          ],
+        } }],
+      }),
+    }),
+  )
+  await page.goto('/?onboarding=0')
+  await expect(page.getByTestId('guest-chip')).toContainText('体验模式')
+  await page.getByTestId('cmd-input').fill('改一下简介')
+  await page.getByTestId('cmd-input').press('Enter')
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant).toContainText('云端备份')
+  await expect(assistant.getByRole('button', { name: '免费注册 / 登录' })).toBeVisible()
 })

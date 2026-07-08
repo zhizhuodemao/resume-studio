@@ -1,105 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { uid } from '../sampleData.js'
-import { polishText, generateBullets, generateSummary, generateCoverLetter } from '../ai.js'
-
-function AiAssist({ t, getPayload, onApply, generate }) {
-  const [phase, setPhase] = useState('idle') // idle | loading | preview | error
-  const [result, setResult] = useState('')
-  const [genInput, setGenInput] = useState('')
-
-  const run = async () => {
-    const payload = getPayload()
-    if (!payload.text || !payload.text.trim()) return
-    setPhase('loading')
-    try {
-      setResult(await polishText(payload.text, payload))
-      setPhase('preview')
-    } catch (err) {
-      console.error(err)
-      setPhase('error')
-    }
-  }
-
-  const runGenerate = async () => {
-    const payload = getPayload()
-    setPhase('loading')
-    try {
-      if (generate.kind === 'summary') {
-        setResult(await generateSummary(generate.getResume()))
-      } else if (generate.kind === 'cover') {
-        setResult(await generateCoverLetter(generate.getResume()))
-      } else {
-        if (!genInput.trim()) {
-          setPhase('idle')
-          return
-        }
-        setResult(await generateBullets(genInput, payload))
-      }
-      setPhase('preview')
-    } catch (err) {
-      console.error(err)
-      setPhase('error')
-    }
-  }
-
-  if (phase === 'preview') {
-    return (
-      <div className="ai-preview">
-        <div className="ai-preview-text">{result}</div>
-        <div className="ai-preview-actions">
-          <button
-            className="btn btn-small ai-apply"
-            onClick={() => {
-              onApply(result)
-              setPhase('idle')
-            }}
-          >
-            {t.ai.apply}
-          </button>
-          <button className="btn btn-small" onClick={() => setPhase('idle')}>
-            {t.ai.discard}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  const isEmpty = !getPayload().text?.trim()
-
-  if (isEmpty && generate) {
-    return (
-      <div className="ai-assist ai-generate">
-        {generate.kind === 'bullets' && (
-          <input
-            className="ai-gen-input"
-            value={genInput}
-            placeholder={t.ai.generateHint}
-            onChange={e => setGenInput(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') runGenerate()
-            }}
-          />
-        )}
-        <button type="button" className="ai-btn" onClick={runGenerate} disabled={phase === 'loading'}>
-          {phase === 'loading'
-            ? t.ai.generating
-            : <><span className="cmd-spark">✦</span> {generate.kind === 'summary' ? t.ai.genSummary : generate.kind === 'cover' ? t.ai.genCover : t.ai.generate}</>}
-        </button>
-        {phase === 'error' && <span className="ai-error">{t.ai.error}</span>}
-      </div>
-    )
-  }
-
-  return (
-    <div className="ai-assist">
-      <button type="button" className="ai-btn" onClick={run} disabled={phase === 'loading'}>
-        {phase === 'loading' ? t.ai.polishing : <><span className="cmd-spark">✦</span> {t.ai.polish}</>}
-      </button>
-      {phase === 'error' && <span className="ai-error">{t.ai.error}</span>}
-    </div>
-  )
-}
 
 function Field({ label, value, onChange, placeholder, type = 'text' }) {
   return (
@@ -603,12 +504,6 @@ export default function Editor({ t, resume, setResume, placeholders, coverLetter
           rich={t.rich}
           onChange={v => setBasics({ summary: v })}
         />
-        <AiAssist
-          t={t}
-          getPayload={() => ({ text: resume.basics.summary, kind: 'summary', role: resume.basics.title })}
-          onApply={v => setBasics({ summary: v })}
-          generate={{ kind: 'summary', getResume: () => resume }}
-        />
       </SectionCard>
     ),
 
@@ -642,12 +537,6 @@ export default function Editor({ t, resume, setResume, placeholders, coverLetter
                   rows={5}
                   rich={t.rich}
                   onChange={v => exp.update(item.id, { highlights: v })}
-                />
-                <AiAssist
-                  t={t}
-                  getPayload={() => ({ text: item.highlights, kind: 'highlights', role: item.role, company: item.company })}
-                  onApply={v => exp.update(item.id, { highlights: v })}
-                  generate={{ kind: 'bullets' }}
                 />
               </div>
             </details>
@@ -685,12 +574,6 @@ export default function Editor({ t, resume, setResume, placeholders, coverLetter
                   rows={4}
                   rich={t.rich}
                   onChange={v => proj.update(item.id, { description: v })}
-                />
-                <AiAssist
-                  t={t}
-                  getPayload={() => ({ text: item.description, kind: 'project', role: item.role, name: item.name })}
-                  onApply={v => proj.update(item.id, { description: v })}
-                  generate={{ kind: 'bullets' }}
                 />
               </div>
             </details>
@@ -811,6 +694,15 @@ export default function Editor({ t, resume, setResume, placeholders, coverLetter
             <span className="section-title">{t.cover.title}</span>
             <span className="section-tools" onClick={e => e.preventDefault()}>
               <button
+                className="icon-btn ai-handoff"
+                title={t.aiHandoff.tooltip}
+                onClick={() =>
+                  window.dispatchEvent(new CustomEvent('assistant-prefill', { detail: t.aiHandoff.cover }))
+                }
+              >
+                ✦
+              </button>
+              <button
                 className="icon-btn"
                 title={coverLetter.enabled ? t.actions.hideSection : t.actions.showSection}
                 onClick={() => onChangeCover({ ...coverLetter, enabled: !coverLetter.enabled })}
@@ -827,12 +719,6 @@ export default function Editor({ t, resume, setResume, placeholders, coverLetter
               rows={10}
               rich={t.rich}
               onChange={v => onChangeCover({ ...coverLetter, content: v })}
-            />
-            <AiAssist
-              t={t}
-              getPayload={() => ({ text: coverLetter.content, kind: 'summary' })}
-              onApply={v => onChangeCover({ ...coverLetter, content: v, enabled: true })}
-              generate={{ kind: 'cover', getResume: () => resume }}
             />
           </div>
         </details>

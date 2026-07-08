@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { checkResume } from '../checker.js'
+import { getGuestQuota } from '../api.js'
 
 // The left-hand conversation panel: one assistant that coaches, edits,
 // analyzes and tailors. Changes appear as chips with per-turn undo.
-export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, initialMessage, onInitialSent }) {
+export default function Assistant({ t, lang, doc, authUser, onRunTurn, onUndoSnapshot, initialMessage, onInitialSent }) {
   const [messages, setMessages] = useState(() => [{ role: 'assistant', content: t.assistant.welcome }])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -12,6 +13,26 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
   const inputRef = useRef(null)
 
   const report = useMemo(() => checkResume(doc.resume, lang), [doc.resume, lang])
+  const [guestQuota, setGuestQuota] = useState(null)
+  const nudgedRef = useRef(false)
+
+  useEffect(() => {
+    if (authUser) {
+      setGuestQuota(null)
+      return
+    }
+    getGuestQuota().then(setGuestQuota).catch(() => setGuestQuota(null))
+  }, [authUser])
+
+  // "hand off to AI" buttons elsewhere prefill the input here
+  useEffect(() => {
+    const onPrefill = e => {
+      setInput(e.detail || '')
+      inputRef.current?.focus()
+    }
+    window.addEventListener('assistant-prefill', onPrefill)
+    return () => window.removeEventListener('assistant-prefill', onPrefill)
+  }, [])
 
   useEffect(() => {
     const el = listRef.current
@@ -75,10 +96,20 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
         labels: result.labels,
         snapshot: result.snapshot,
       })
+      if (!authUser) {
+        getGuestQuota().then(setGuestQuota).catch(() => {})
+        if (result.labels.length && !nudgedRef.current) {
+          nudgedRef.current = true
+          setMessages(ms => [...ms, { role: 'assistant', system: true, nudge: true, content: t.assistant.nudge }])
+        }
+      }
     } catch (err) {
       console.error(err)
       if (err.code === 'auth_required') {
         finalize({ role: 'assistant', content: t.account.needLogin })
+        window.dispatchEvent(new CustomEvent('open-login'))
+      } else if (err.code === 'guest_trial_exhausted') {
+        finalize({ role: 'assistant', content: t.account.trialExhausted })
         window.dispatchEvent(new CustomEvent('open-login'))
       } else if (err.code === 'quota_exceeded') {
         finalize({ role: 'assistant', content: t.account.quotaExceeded, error: true })
@@ -113,6 +144,12 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
         </span>
         <span className="assistant-health-toggle">{showFindings ? '▾' : '▸'}</span>
       </div>
+      {!authUser && guestQuota && (
+        <div className="guest-chip" data-testid="guest-chip">
+          <span>{t.assistant.guestMode(guestQuota.remaining)}</span>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('open-login'))}>{t.account.login}</button>
+        </div>
+      )}
       {showFindings && report.findings.length > 0 && (
         <div className="assistant-findings">
           {report.findings.slice(0, 8).map((f, i) => (
@@ -125,7 +162,7 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
 
       <div className="coach-list assistant-list" ref={listRef}>
         {messages.map((m, i) => (
-          <div key={i} className={`coach-msg coach-msg-${m.role} ${m.error ? 'coach-msg-error' : ''}`}>
+          <div key={i} className={`coach-msg coach-msg-${m.role} ${m.error ? 'coach-msg-error' : ''} ${m.nudge ? 'coach-msg-nudge' : ''}`}>
             <div className={`coach-bubble ${m.streaming ? 'streaming' : ''}`}>
               {m.content || (m.streaming ? t.coach.thinking : '')}
             </div>
@@ -149,6 +186,14 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
               </button>
             )}
             {m.undone && <div className="assistant-undone">{t.assistant.undone}</div>}
+            {m.nudge && (
+              <button
+                className="btn btn-small nudge-cta"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-login'))}
+              >
+                {t.assistant.nudgeCta}
+              </button>
+            )}
           </div>
         ))}
         {messages.length === 1 && !busy && (

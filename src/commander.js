@@ -133,6 +133,17 @@ export const COMMAND_TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'set_cover_letter',
+      description: '撰写或修改求职信（作为附加页展示）。content 为求职信全文；enabled 控制是否随简历导出。',
+      parameters: {
+        type: 'object',
+        properties: { content: { type: 'string' }, enabled: { type: 'boolean' } },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'translate_resume',
       description: '整份简历翻译成目标语言',
       parameters: {
@@ -303,6 +314,20 @@ export function applyCommandAction(doc, action, t) {
     const order = [...requested, ...valid.filter(k => !requested.includes(k))]
     if (order.join() === valid.join()) return null
     return { doc: { ...doc, resume: { ...doc.resume, sectionOrder: order } }, label: t.cmd.labels.reorder }
+  }
+  if (name === 'set_cover_letter') {
+    const cover = { ...(doc.coverLetter || { enabled: false, content: '' }) }
+    let touched = false
+    if (str(args.content)?.trim()) {
+      cover.content = args.content
+      cover.enabled = args.enabled !== false
+      touched = true
+    } else if (typeof args.enabled === 'boolean' && args.enabled !== cover.enabled) {
+      cover.enabled = args.enabled
+      touched = true
+    }
+    if (!touched) return null
+    return { doc: { ...doc, coverLetter: cover }, label: t.cmd.labels.cover }
   }
   if (name === 'toggle_section') {
     const key = args.key

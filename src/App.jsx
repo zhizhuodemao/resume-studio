@@ -13,8 +13,8 @@ import Toolbar from './components/Toolbar.jsx'
 import Editor from './components/Editor.jsx'
 import Preview from './components/Preview.jsx'
 import Onboarding from './components/Onboarding.jsx'
-import Insight from './components/Insight.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import AppearancePanel from './components/AppearancePanel.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
 import { translateResume, tailorResume } from './ai.js'
 import { downloadDocx, downloadText } from './exporters.js'
@@ -102,10 +102,7 @@ const HISTORY_COALESCE_MS = 700
 export default function App() {
   const [state, setState] = useState(initialState)
   const [onboarding, setOnboarding] = useState(shouldShowOnboarding)
-  const [rightPanel, setRightPanel] = useState(() => {
-    const p = new URLSearchParams(window.location.search).get('panel')
-    return p === 'insight' || p === 'coach' ? p : null
-  })
+  const [refineTab, setRefineTab] = useState('content')
   const [mobileView, setMobileView] = useState('edit')
   const [refineOpen, setRefineOpen] = useState(false)
   const [pendingJd, setPendingJd] = useState(null)
@@ -326,13 +323,8 @@ export default function App() {
   const canUndo = historyState.docId === activeId && historyState.undo.length > 0
   const canRedo = historyState.docId === activeId && historyState.redo.length > 0
 
-  /* ---------- AI translate state (declared early: doc ops reset it) ---------- */
-  const [translating, setTranslating] = useState(false)
-  const [translateBackup, setTranslateBackup] = useState(null)
-
   /* ---------- Multi-resume operations ---------- */
   const switchDoc = useCallback(id => {
-    setTranslateBackup(null)
     setState(s => (s.resumes.some(d => d.id === id) ? { ...s, activeId: id } : s))
   }, [])
 
@@ -421,27 +413,6 @@ export default function App() {
   }
   const handleExport = () => window.print()
 
-  /* ---------- AI translate ---------- */
-  const handleTranslate = async target => {
-    if (translating || !active) return
-    if (!window.confirm(t.ai.confirmTranslate)) return
-    setTranslating(true)
-    try {
-      const translated = await translateResume(active.resume, target)
-      setTranslateBackup(active.resume)
-      setResume(translated)
-    } catch (err) {
-      console.error(err)
-      window.alert(t.ai.error)
-    } finally {
-      setTranslating(false)
-    }
-  }
-  const handleUndoTranslate = () => {
-    if (!translateBackup) return
-    setResume(translateBackup)
-    setTranslateBackup(null)
-  }
 
   /* ---------- Page fit (one-page compression) ---------- */
   const handleFitToggle = useCallback(
@@ -462,35 +433,6 @@ export default function App() {
     [patchDoc],
   )
 
-  /* ---------- L3 agents ---------- */
-  const handleCreateTailored = useCallback(
-    tailoredResume => {
-      const s = stateRef.current
-      const doc = s.resumes.find(d => d.id === s.activeId)
-      if (!doc) return
-      const copy = makeDoc({
-        ...doc,
-        name: `${doc.name || t.docs.untitled} · ${t.docs.tailoredSuffix}`,
-        resume: tailoredResume,
-      })
-      setState(cur => ({ ...cur, resumes: [...cur.resumes, copy], activeId: copy.id }))
-    },
-    [t],
-  )
-
-  const handleCoachPatch = useCallback(
-    patch => {
-      const s = stateRef.current
-      const doc = s.resumes.find(d => d.id === s.activeId)
-      if (!doc) return false
-      const next = applyCoachPatch(doc.resume, patch)
-      if (next === doc.resume) return false
-      setResume(next)
-      return true
-    },
-    [setResume],
-  )
-
   /* ---------- Unified AI assistant ---------- */
   const runAssistantTurn = useCallback(
     async (history, callbacks) => {
@@ -504,6 +446,7 @@ export default function App() {
         typography: doc.typography,
         page: doc.page,
         resume: doc.resume,
+        coverLetter: doc.coverLetter,
       }
       let cur = { ...doc }
       const labels = []
@@ -539,6 +482,7 @@ export default function App() {
           typography: cur.typography,
           page: cur.page,
           resume: cur.resume,
+          coverLetter: cur.coverLetter,
         })
         window.dispatchEvent(new CustomEvent('ai-updated'))
         if (wantsFit) {
@@ -585,6 +529,7 @@ export default function App() {
     }, 80)
   }, [])
 
+  /* ---------- Exports ---------- */
   const handleExportDocx = () => active && downloadDocx(active.resume, t, active.name || 'resume')
   const handleExportText = () => active && downloadText(active.resume, t, active.name || 'resume')
   const handleChangeCover = useCallback(cover => patchDoc({ coverLetter: cover }), [patchDoc])
@@ -654,11 +599,6 @@ export default function App() {
           onApplySample={applySample}
           onClear={handleClear}
           onExport={handleExport}
-          onTranslate={handleTranslate}
-          translating={translating}
-          canUndoTranslate={Boolean(translateBackup)}
-          onUndoTranslate={handleUndoTranslate}
-          onToggleInsight={() => setRightPanel(p => (p === 'insight' ? null : 'insight'))}
           refineOpen={refineOpen}
           onToggleRefine={() => setRefineOpen(o => !o)}
           authUser={authUser}
@@ -670,6 +610,7 @@ export default function App() {
             t={t}
             lang={lang}
             doc={active}
+            authUser={authUser}
             onRunTurn={runAssistantTurn}
             onUndoSnapshot={handleUndoSnapshot}
             initialMessage={pendingJd ? t.assistant.jdIntro(pendingJd) : null}
@@ -696,30 +637,45 @@ export default function App() {
           {refineOpen && (
             <aside className="refine-panel" data-testid="refine-panel">
               <div className="refine-head">
-                <span className="refine-title">{t.refine.title}</span>
-                <button className="icon-btn" title={t.insight.close} onClick={() => setRefineOpen(false)}>
+                <div className="refine-tabs">
+                  <button
+                    className={refineTab === 'content' ? 'active' : ''}
+                    onClick={() => setRefineTab('content')}
+                  >
+                    {t.refine.tabContent}
+                  </button>
+                  <button
+                    className={refineTab === 'looks' ? 'active' : ''}
+                    onClick={() => setRefineTab('looks')}
+                    data-testid="looks-tab"
+                  >
+                    {t.refine.tabLooks}
+                  </button>
+                </div>
+                <button className="icon-btn" title={t.refine.close} onClick={() => setRefineOpen(false)}>
                   ✕
                 </button>
               </div>
-              <Editor
-                t={t}
-                resume={active.resume}
-                setResume={setResume}
-                placeholders={placeholders}
-                coverLetter={active.coverLetter}
-                onChangeCover={handleChangeCover}
-              />
+              {refineTab === 'content' ? (
+                <Editor
+                  t={t}
+                  resume={active.resume}
+                  setResume={setResume}
+                  placeholders={placeholders}
+                  coverLetter={active.coverLetter}
+                  onChangeCover={handleChangeCover}
+                />
+              ) : (
+                <AppearancePanel
+                  t={t}
+                  template={active.template}
+                  accent={active.accent}
+                  typography={active.typography}
+                  page={active.page}
+                  onPatchDoc={patchDoc}
+                />
+              )}
             </aside>
-          )}
-          {rightPanel === 'insight' && (
-            <Insight
-              t={t}
-              lang={lang}
-              resume={active.resume}
-              sectionsLabel={key => t.sections[key] || key}
-              onCreateTailored={handleCreateTailored}
-              onClose={() => setRightPanel(null)}
-            />
           )}
         </div>
         <nav className="mobile-tabs">

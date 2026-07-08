@@ -60,6 +60,12 @@ export default function Onboarding({ t, lang, onPatch, onStart, onSkip }) {
             {t.onboarding.skip}
           </button>
         </div>
+        <button
+          className="onboard-login-link"
+          onClick={() => window.dispatchEvent(new CustomEvent('open-login'))}
+        >
+          {t.onboarding.haveAccount}
+        </button>
       </div>
     </div>
   )

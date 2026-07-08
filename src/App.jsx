@@ -463,6 +463,8 @@ export default function App() {
     page: doc.page,
     resume: doc.resume,
     coverLetter: doc.coverLetter,
+    jd: doc.jd,
+    jdReport: doc.jdReport,
   })
 
   const runAssistantTurn = useCallback(
@@ -486,6 +488,24 @@ export default function App() {
 
       const execute = async ({ name, args }) => {
         const actionId = `a${seq++}`
+        if (name === 'plan_steps') {
+          const steps = (Array.isArray(args?.steps) ? args.steps : []).filter(x => typeof x === 'string' && x.trim())
+          if (!steps.length) return { ok: false, hint: 'steps 为空' }
+          callbacks?.onPlan?.(steps)
+          return { ok: true }
+        }
+        if (name === 'mark_step_done') {
+          if (!Number.isInteger(args?.index)) return { ok: false, hint: 'index 无效' }
+          callbacks?.onPlanTick?.(args.index)
+          return { ok: true }
+        }
+        if (name === 'save_target_jd') {
+          if (typeof args?.jd !== 'string' || !args.jd.trim()) return { ok: false, hint: '缺少 jd' }
+          cur = { ...cur, jd: args.jd, jdReport: null }
+          if (live) applyLive()
+          callbacks?.onAction?.({ id: actionId, label: t.jdPanel.saved, status: 'done' })
+          return { ok: true, changed: ['jd'] }
+        }
         if (name === 'translate_resume') {
           const target = args?.target === 'en' ? 'en' : 'zh'
           callbacks?.onAction?.({ id: actionId, label: t.cmd.labels.translate, status: 'running' })
@@ -510,6 +530,7 @@ export default function App() {
               name: `${doc.name || t.docs.untitled} · ${t.docs.tailoredSuffix}`,
               resume: tailored,
             })
+            copy.jd = args.jd
             setState(prev => ({ ...prev, resumes: [...prev.resumes, copy], activeId: copy.id }))
             callbacks?.onAction?.({ id: actionId, label: t.cmd.labels.tailored, status: 'done' })
             return { ok: true, changed: ['tailored_doc'] }
@@ -700,6 +721,8 @@ export default function App() {
             onRunTurn={runAssistantTurn}
             onUndoSnapshot={handleUndoSnapshot}
             onApplyPending={handleApplyPending}
+            onSaveJd={jd => patchDoc({ jd, jdReport: null })}
+            onSaveJdReport={jdReport => patchDoc({ jdReport })}
             reviewMode={reviewMode}
             onToggleReviewMode={toggleReviewMode}
             initialMessage={pendingJd ? t.assistant.jdIntro(pendingJd) : null}
@@ -785,7 +808,10 @@ export default function App() {
           onPatch={patch}
           onStart={(tr, stage, jd) => {
             applySample(tr, stage, false)
-            if (jd) setPendingJd(jd)
+            if (jd) {
+              setPendingJd(jd)
+              patchDoc({ jd, jdReport: null })
+            }
             setOnboarding(false)
           }}
           onSkip={() => setOnboarding(false)}

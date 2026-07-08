@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { PAGE_DIMENSIONS } from '../store.js'
 
 export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, onSectionClick, children }) {
+  const [selEdit, setSelEdit] = useState(null) // { x, y, text }
   const dims = PAGE_DIMENSIONS[page?.size] || PAGE_DIMENSIONS.a4
   const fitActive = Boolean(page?.fitScale && page.fitScale < 1)
 
@@ -67,13 +68,51 @@ export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, on
 
   // Click a section in the preview -> open refine mode at the matching card
   const jumpToEditor = e => {
+    if (String(window.getSelection() || '').trim()) return // selecting, not clicking
     const heading = e.target.closest('section')?.querySelector('h2')
     const title = heading?.textContent?.trim()
     if (title) onSectionClick?.(title)
   }
 
+  // Select text on the canvas -> floating "edit this" handoff to the AI
+  const handleSelection = () => {
+    const sel = window.getSelection()
+    const text = String(sel || '').trim()
+    if (!text || text.length < 4 || text.length > 600 || sel.rangeCount === 0) {
+      setSelEdit(null)
+      return
+    }
+    const range = sel.getRangeAt(0)
+    if (!areaRef.current?.contains(range.commonAncestorContainer)) {
+      setSelEdit(null)
+      return
+    }
+    const rect = range.getBoundingClientRect()
+    const area = areaRef.current.getBoundingClientRect()
+    setSelEdit({
+      x: Math.min(rect.left - area.left + rect.width / 2, area.width - 70),
+      y: rect.top - area.top + areaRef.current.scrollTop - 38,
+      text,
+    })
+  }
+
   return (
-    <main className="preview" ref={areaRef}>
+    <main className="preview" ref={areaRef} onMouseUp={handleSelection}>
+      {selEdit && (
+        <button
+          className="sel-edit-btn"
+          data-testid="sel-edit-btn"
+          style={{ left: selEdit.x, top: Math.max(4, selEdit.y) }}
+          onMouseDown={e => e.preventDefault()}
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('assistant-prefill', { detail: t.selEdit.prefill(selEdit.text) }))
+            setSelEdit(null)
+            window.getSelection()?.removeAllRanges()
+          }}
+        >
+          ✦ {t.selEdit.button}
+        </button>
+      )}
       <div
         className="preview-canvas"
         style={{ width: dims.width * scale, height: contentHeight * scale }}

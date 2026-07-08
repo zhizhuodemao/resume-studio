@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { checkResume } from '../checker.js'
+import { coachCoverage } from '../coverage.js'
+import { matchJD } from '../ai.js'
 import { getGuestQuota } from '../api.js'
 import { renderInline } from '../templates/shared.jsx'
 
@@ -32,6 +34,25 @@ function BubbleText({ text }) {
     ) : (
       <p key={i}>{renderInline(b.text)}</p>
     ),
+  )
+}
+
+// Step checklist for big tasks (plan_steps / mark_step_done tools).
+function PlanCard({ t, plan }) {
+  if (!plan?.steps?.length) return null
+  const done = plan.ticks.filter(Boolean).length
+  return (
+    <div className="plan-card" data-testid="plan-card">
+      <div className="plan-head">
+        {t.agent.plan} · {done}/{plan.steps.length}
+      </div>
+      {plan.steps.map((step, i) => (
+        <div key={i} className={`plan-step ${plan.ticks[i] ? 'done' : ''}`}>
+          <span className="plan-box">{plan.ticks[i] ? '✓' : ''}</span>
+          {step}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -138,6 +159,7 @@ function persistChat(docId, messages) {
   try {
     const slim = messages.slice(-CHAT_LIMIT).map(m => {
       const { snapshot, pending, actionLog, streaming, ...rest } = m
+      if (rest.plan) rest.plan = { steps: rest.plan.steps, ticks: rest.plan.ticks }
       return rest
     })
     localStorage.setItem(chatKey(docId), JSON.stringify(slim))
@@ -154,6 +176,8 @@ export default function Assistant({
   onRunTurn,
   onUndoSnapshot,
   onApplyPending,
+  onSaveJd,
+  onSaveJdReport,
   reviewMode,
   onToggleReviewMode,
   initialMessage,
@@ -168,6 +192,12 @@ export default function Assistant({
   const lastUserRef = useRef('')
 
   const report = useMemo(() => checkResume(doc.resume, lang), [doc.resume, lang])
+  const coverage = useMemo(() => coachCoverage(doc.resume, lang), [doc.resume, lang])
+  const [showCoverage, setShowCoverage] = useState(false)
+  const [showJd, setShowJd] = useState(false)
+  const [jdDraft, setJdDraft] = useState(doc.jd || '')
+  const [jdBusy, setJdBusy] = useState(false)
+  useEffect(() => setJdDraft(doc.jd || ''), [doc.id, doc.jd])
   const [guestQuota, setGuestQuota] = useState(null)
   const nudgedRef = useRef(false)
 
@@ -255,7 +285,7 @@ export default function Assistant({
         const copy = [...ms]
         const last = copy[copy.length - 1]
         // keep the executed-action log visible in the final message
-        const merged = last?.streaming ? { actionLog: last.actionLog, ...finalMsg } : finalMsg
+        const merged = last?.streaming ? { actionLog: last.actionLog, plan: last.plan, ...finalMsg } : finalMsg
         if (last?.streaming) copy[copy.length - 1] = merged
         else copy.push(merged)
         return copy
@@ -271,6 +301,11 @@ export default function Assistant({
             else log.push(entry)
             return { ...m, actionLog: log }
           }),
+        onPlan: steps => patchStreaming(m => ({ ...m, plan: { steps, ticks: steps.map(() => false) } })),
+        onPlanTick: index =>
+          patchStreaming(m =>
+            m.plan ? { ...m, plan: { ...m.plan, ticks: m.plan.ticks.map((v, j) => (j === index ? true : v)) } } : m,
+          ),
       })
       finalize({
         role: 'assistant',
@@ -329,6 +364,24 @@ export default function Assistant({
 
   const focusSection = label => window.dispatchEvent(new CustomEvent('canvas-focus', { detail: label }))
 
+  const analyzeJd = async () => {
+    const jd = jdDraft.trim()
+    if (!jd || jdBusy) return
+    onSaveJd(jd)
+    setJdBusy(true)
+    try {
+      const jdReport = await matchJD(doc.resume, jd)
+      onSaveJdReport(jdReport)
+    } catch (err) {
+      console.error(err)
+      if (err.code === 'auth_required' || err.code === 'guest_trial_exhausted') {
+        window.dispatchEvent(new CustomEvent('open-login'))
+      }
+    } finally {
+      setJdBusy(false)
+    }
+  }
+
   // context-aware suggestions: empty resume / has findings / default
   const suggestions = useMemo(() => {
     const r = doc.resume
@@ -358,6 +411,66 @@ export default function Assistant({
           <button onClick={() => window.dispatchEvent(new CustomEvent('open-login'))}>{t.account.login}</button>
         </div>
       )}
+      <div className="assistant-meta-row">
+        <button className={`meta-chip ${showCoverage ? 'open' : ''}`} onClick={() => setShowCoverage(v => !v)} data-testid="coverage-btn">
+          {t.coach.progress} {coverage.filter(a => a.status === 'good').length}/{coverage.length}
+        </button>
+        <button className={`meta-chip ${showJd ? 'open' : ''} ${doc.jd ? 'meta-chip-set' : ''}`} onClick={() => setShowJd(v => !v)} data-testid="jd-btn">
+          🎯 {doc.jd ? t.jdPanel.set : t.jdPanel.unset}
+          {doc.jdReport ? ` · ${doc.jdReport.score}` : ''}
+        </button>
+      </div>
+      {showCoverage && (
+        <div className="assistant-findings coverage-panel" data-testid="coverage-panel">
+          {coverage.map(a => (
+            <button
+              key={a.key}
+              className={`coverage-row status-${a.status}`}
+              onClick={() => {
+                setInput(t.coach.askAbout(a.label))
+                inputRef.current?.focus()
+              }}
+            >
+              <span className="coverage-dot" />
+              <span className="coverage-label">{a.label}</span>
+              <span className="coverage-hint">{a.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {showJd && (
+        <div className="jd-panel" data-testid="jd-panel">
+          <textarea
+            rows={3}
+            value={jdDraft}
+            placeholder={t.jdPanel.placeholder}
+            onChange={e => setJdDraft(e.target.value)}
+          />
+          <div className="jd-panel-actions">
+            <button className="btn btn-small btn-primary" disabled={jdBusy || !jdDraft.trim()} onClick={analyzeJd}>
+              {jdBusy ? t.insight.analyzing : t.jdPanel.analyze}
+            </button>
+            {doc.jdReport && <span className="jd-score">{t.insight.matchScore} {doc.jdReport.score}</span>}
+          </div>
+          {doc.jdReport?.missing_keywords?.length > 0 && (
+            <div className="jd-keywords">
+              <span className="jd-kw-label">{t.insight.missing}</span>
+              {doc.jdReport.missing_keywords.slice(0, 8).map((kw, i) => (
+                <button
+                  key={i}
+                  className="track-chip jd-kw"
+                  onClick={() => {
+                    setInput(t.jdPanel.weave(kw))
+                    inputRef.current?.focus()
+                  }}
+                >
+                  {kw}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {showFindings && report.findings.length > 0 && (
         <div className="assistant-findings">
           {report.findings.slice(0, 8).map((f, i) => (
@@ -385,6 +498,7 @@ export default function Assistant({
                   )}
                 </div>
               )}
+              {m.plan && <PlanCard t={t} plan={m.plan} />}
               {m.actionLog?.length > 0 && (
                 <div className="action-log">
                   {m.actionLog.map(entry => (
@@ -418,7 +532,7 @@ export default function Assistant({
             </div>
           </div>
         ))}
-        {messages.filter(m => m.role === 'user').length === 0 && !busy && (
+        {!busy && !messages[messages.length - 1]?.streaming && (
           <div className="assistant-suggestions">
             {suggestions.map((sug, i) => (
               <button key={i} className="track-chip" onClick={() => send(sug)}>

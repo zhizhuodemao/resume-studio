@@ -526,3 +526,83 @@ test('conversation persists across reloads per document', async ({ page }) => {
   await expect(assistant).toContainText('已完成修改')
   await expect(assistant.getByTestId('diff-card').first()).toContainText('个人简介')
 })
+
+test('plan checklist renders and ticks during a multi-step task', async ({ page }) => {
+  await mockAgent(page, [
+    { content: '', tool_calls: [toolCall('plan_steps', { steps: ['优化简介', '量化工作经历', '调整模板'] })] },
+    { content: '', tool_calls: [
+      toolCall('update_resume_content', { summary: '按计划更新的简介' }, 'c2'),
+      toolCall('mark_step_done', { index: 0 }, 'c3'),
+    ] },
+    { content: '', tool_calls: [toolCall('mark_step_done', { index: 1 }, 'c4'), toolCall('set_template', { template: 'minimal' }, 'c5'), toolCall('mark_step_done', { index: 2 }, 'c6')] },
+    { content: '全部完成。' },
+  ])
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('cmd-input').fill('整份简历全面优化一遍')
+  await page.getByTestId('cmd-input').press('Enter')
+  const plan = page.getByTestId('plan-card')
+  await expect(plan).toContainText('执行计划 · 3/3')
+  await expect(plan.locator('.plan-step.done')).toHaveCount(3)
+  await expect(page.locator('.preview .resume.tpl-minimal')).toHaveCount(1)
+})
+
+test('selecting canvas text offers an AI handoff that prefills the input', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  // select the summary paragraph on the canvas
+  await page.evaluate(() => {
+    const sections = [...document.querySelectorAll('.preview .page section')]
+    const sec = sections.find(el => el.querySelector('h2')?.textContent.includes('个人简介'))
+    const para = sec.querySelector('p')
+    const range = document.createRange()
+    range.selectNodeContents(para)
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+  })
+  await page.locator('.preview').dispatchEvent('mouseup')
+  const btn = page.getByTestId('sel-edit-btn')
+  await expect(btn).toBeVisible()
+  await btn.click()
+  const input = page.getByTestId('cmd-input')
+  await expect(input).toHaveValue(/修改画布上选中的这段内容/)
+  await expect(input).toHaveValue(/6 年大型 Web 应用开发经验/)
+})
+
+test('JD workspace: save target, analyze match, keyword chips prefill', async ({ page }) => {
+  await page.route('**/api/ai/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          score: 68,
+          missing_keywords: ['Kubernetes', '微服务'],
+          strengths: ['React 深度匹配'],
+          suggestions: ['补充容器化经验'],
+        }) } }],
+      }),
+    }),
+  )
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('jd-btn').click()
+  const panel = page.getByTestId('jd-panel')
+  await panel.locator('textarea').fill('招聘高级前端，要求 React、Kubernetes、微服务')
+  await panel.getByRole('button', { name: '分析匹配度' }).click()
+  await expect(panel).toContainText('匹配度 68')
+  const kw = panel.locator('.jd-kw', { hasText: 'Kubernetes' })
+  await expect(kw).toBeVisible()
+  await kw.click()
+  await expect(page.getByTestId('cmd-input')).toHaveValue(/自然融入关键词「Kubernetes」/)
+  // target chip reflects the saved JD + score
+  await expect(page.getByTestId('jd-btn')).toContainText('目标岗位 · 68')
+})
+
+test('coach progress panel maps weak areas and prefills an interview', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('doc-switcher').click()
+  await page.getByRole('button', { name: '新建空白' }).click()
+  await page.getByTestId('coverage-btn').click()
+  const panel = page.getByTestId('coverage-panel')
+  await expect(panel.locator('.coverage-row.status-missing').first()).toBeVisible()
+  await panel.locator('.coverage-row', { hasText: '工作经历' }).click()
+  await expect(page.getByTestId('cmd-input')).toHaveValue(/围绕「工作经历」向我提问/)
+})

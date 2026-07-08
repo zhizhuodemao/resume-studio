@@ -85,8 +85,22 @@ export const MESSAGES = {
       tailoring: '定制生成中…',
       tailored: '已创建定制版简历，并已切换过去',
     },
+    selEdit: {
+      button: '改这段',
+      prefill: text => `修改画布上选中的这段内容：「${text.slice(0, 200)}」\n要求：`,
+    },
+    jdPanel: {
+      set: '目标岗位',
+      unset: '设置目标岗位',
+      saved: '目标岗位已保存',
+      placeholder: '粘贴目标职位描述（JD），保存后 AI 会围绕它持续优化你的简历…',
+      analyze: '分析匹配度',
+      weave: kw => `在简历合适的位置自然融入关键词「${kw}」，不要生硬堆砌`,
+    },
     coach: {
       open: 'AI 教练',
+      progress: '教练进度',
+      askAbout: label => `教练模式：围绕「${label}」向我提问，帮我完善这部分`,
       title: '简历教练',
       welcome:
         '你好，我是你的简历教练。我会像面试官一样提问，把你的回答变成专业的简历内容。先从这个问题开始：你最近一段工作里，最有成就感的一件事是什么？有没有具体的数字（规模、增长、金额）？',
@@ -186,6 +200,7 @@ export const MESSAGES = {
       reviewAuto: '自动应用',
       reviewConfirm: '先确认',
       reviewHint: '自动应用：AI 修改直接生效（可撤销）；先确认：先看修改对照，采纳后才生效',
+      plan: '执行计划',
     },
     diff: {
       appearance: '外观',
@@ -408,8 +423,22 @@ export const MESSAGES = {
       tailoring: 'Tailoring…',
       tailored: 'Tailored resume created and opened',
     },
+    selEdit: {
+      button: 'Edit this',
+      prefill: text => `Edit this selected passage from the canvas: "${text.slice(0, 200)}"\nRequirement: `,
+    },
+    jdPanel: {
+      set: 'Target role',
+      unset: 'Set target role',
+      saved: 'Target JD saved',
+      placeholder: 'Paste the target job description — the AI keeps optimizing your resume against it…',
+      analyze: 'Analyze match',
+      weave: kw => `Weave the keyword "${kw}" naturally into the resume where it fits`,
+    },
     coach: {
       open: 'AI Coach',
+      progress: 'Coach progress',
+      askAbout: label => `Coach mode: interview me about "${label}" to improve that part`,
       title: 'Resume Coach',
       welcome:
         "Hi, I'm your resume coach. I'll interview you like a hiring manager and turn your answers into professional resume content. First question: what's the achievement you're most proud of in your recent role — any concrete numbers?",
@@ -509,6 +538,7 @@ export const MESSAGES = {
       reviewAuto: 'Auto-apply',
       reviewConfirm: 'Review first',
       reviewHint: 'Auto-apply: edits land immediately (undoable). Review first: see the before/after, apply on accept.',
+      plan: 'Plan',
     },
     diff: {
       appearance: 'Appearance',

@@ -3,11 +3,48 @@
 import { COMMAND_TOOLS } from './commander.js'
 import { resumeDigest } from './ai.js'
 import { chatStream } from './sse.js'
+import { coverageDigest } from './coverage.js'
 
 const MODEL = 'deepseek-chat'
 
 export const ASSISTANT_TOOLS = [
   ...COMMAND_TOOLS,
+  {
+    type: 'function',
+    function: {
+      name: 'plan_steps',
+      description: '大任务（涉及 3 个以上板块或多轮修改）开始前调用：列出 3-6 步执行计划，用户会看到清单。',
+      parameters: {
+        type: 'object',
+        properties: { steps: { type: 'array', items: { type: 'string' }, description: '每步一句话' } },
+        required: ['steps'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'mark_step_done',
+      description: '完成计划中的一步后调用，勾选该步骤（index 从 0 开始）。',
+      parameters: {
+        type: 'object',
+        properties: { index: { type: 'integer' } },
+        required: ['index'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'save_target_jd',
+      description: '用户粘贴目标职位描述（JD）时调用，把 JD 保存到当前简历的目标岗位档案（用于持续的匹配追踪）。',
+      parameters: {
+        type: 'object',
+        properties: { jd: { type: 'string' } },
+        required: ['jd'],
+      },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -38,14 +75,17 @@ function docContext(doc, t) {
     `当前简历「${doc.name || '未命名'}」；模板: ${doc.template}；主题色: ${doc.accent}；` +
     `排版: 字体=${doc.typography.font} 字号=${doc.typography.size} 密度=${doc.typography.density}；` +
     `纸张=${doc.page.size} 边距=${doc.page.margin}\n` +
-    `板块(key=名称): ${sectionNames}\n隐藏板块: ${r.hiddenSections.join(', ') || '无'}\n\n简历内容:\n${resumeDigest(r).slice(0, 3500)}`
+    `板块(key=名称): ${sectionNames}\n隐藏板块: ${r.hiddenSections.join(', ') || '无'}\n` +
+    `教练覆盖情况: ${coverageDigest(r)}\n` +
+    (doc.jd ? `目标岗位 JD（已保存）: ${doc.jd.slice(0, 600)}\n` : '') +
+    `\n简历内容:\n${resumeDigest(r).slice(0, 3500)}`
   )
 }
 
 // Real agent loop: the model calls tools, SEES each execution result
 // (ok / no-op / error), and keeps going until it decides it's done.
 // `execute` is provided by the app and returns a JSON-able result.
-export async function runAgentLoop({ history, getDoc, t, uiLang = 'zh', execute, callbacks = {}, maxIters = 6 }) {
+export async function runAgentLoop({ history, getDoc, t, uiLang = 'zh', execute, callbacks = {}, maxIters = 8 }) {
   const doc = getDoc()
   const langNote = uiLang === 'zh' ? '始终用中文回复。' : 'Always reply in English.'
   const system =
@@ -57,7 +97,8 @@ export async function runAgentLoop({ history, getDoc, t, uiLang = 'zh', execute,
     '4) 回复口语化、简短（1-3 句 + 必要的列表）。不要重复简历内容原文。\n' +
     '5) 铁律：对简历的任何修改只能通过工具调用完成。绝不在文字回复里粘贴改写后的内容，绝不在没有调用工具的情况下声称"已更新/已修改"。用户要求修改时，直接调用工具，不要先征求确认（除了生成定制版）。\n' +
     '6) update_resume_content 可修改：简介(summary)、基本信息(basics)、工作经历(experience)、项目(projects)、教育经历(education)——均按简历摘要中的序号 工作[i]/项目[i]/教育[i] 定位；新增条目用 experience_add/education_add/projects_add/skills_add。\n' +
-    '7) 每次工具调用后你会收到 JSON 执行结果：ok=true 表示已生效（changed 列出实际修改的板块）；ok=false 表示没有产生任何修改（hint 说明原因，如序号不存在、字段不支持、内容与原文相同）——此时修正参数重试，不要重复相同的调用。全部完成后用一句话总结，不要罗列修改内容原文。\n' +
+    '7) 大任务（涉及 3 个以上板块）：先调用 plan_steps 列出计划，执行过程中每完成一步调用 mark_step_done 勾选。教练访谈优先针对"教练覆盖情况"中标记为 缺失/弱 的部分提问。用户粘贴 JD 时先调用 save_target_jd 保存。\n' +
+    '8) 每次工具调用后你会收到 JSON 执行结果：ok=true 表示已生效（changed 列出实际修改的板块）；ok=false 表示没有产生任何修改（hint 说明原因，如序号不存在、字段不支持、内容与原文相同）——此时修正参数重试，不要重复相同的调用。全部完成后用一句话总结，不要罗列修改内容原文。\n' +
     langNote +
     '\n\n' +
     docContext(doc, t)

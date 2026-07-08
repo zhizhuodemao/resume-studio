@@ -28,6 +28,8 @@ export function makeDoc({ name = '', resume, template = 'modern', accent = DEFAU
     typography: { ...DEFAULT_TYPOGRAPHY, ...typography },
     page: { ...DEFAULT_PAGE, ...page },
     coverLetter: { enabled: false, content: '' },
+    jd: '',
+    jdReport: null,
     resume: normalizeResume(resume || emptyResume()),
   }
 }
@@ -105,6 +107,8 @@ function normalizeDoc(d) {
     typography: { ...DEFAULT_TYPOGRAPHY, ...(doc.typography && typeof doc.typography === 'object' ? doc.typography : {}) },
     page: normalizePage(doc.page),
     coverLetter: normalizeCover(doc.coverLetter),
+    jd: typeof doc.jd === 'string' ? doc.jd : '',
+    jdReport: doc.jdReport && typeof doc.jdReport === 'object' ? doc.jdReport : null,
     resume: normalizeResume(doc.resume),
   }
 }

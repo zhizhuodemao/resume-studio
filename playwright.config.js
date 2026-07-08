@@ -6,7 +6,8 @@ export default defineConfig({
   fullyParallel: true,
   use: {
     baseURL: 'http://localhost:5199',
-    channel: 'chrome',
+    // Local runs use the installed Chrome; CI installs chromium instead.
+    ...(process.env.CI ? {} : { channel: 'chrome' }),
     headless: true,
     locale: 'zh-CN',
   },

@@ -210,6 +210,8 @@ export const MESSAGES = {
     },
     skillLevels: ['了解', '熟悉', '熟练', '精通', '专家'],
     untitled: '未命名',
+    renderError: '该模板渲染出错，请切换模板或撤销最近的修改。',
+    renderRetry: '重试',
     pageBreakHint: '虚线为 A4 分页参考线',
   },
   en: {
@@ -423,6 +425,8 @@ export const MESSAGES = {
     },
     skillLevels: ['Basic', 'Familiar', 'Proficient', 'Advanced', 'Expert'],
     untitled: 'Untitled',
+    renderError: 'This template failed to render. Try another template or undo the last change.',
+    renderRetry: 'Retry',
     pageBreakHint: 'Dashed line marks the A4 page break',
   },
 }

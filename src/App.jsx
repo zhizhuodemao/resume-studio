@@ -14,6 +14,7 @@ import Editor from './components/Editor.jsx'
 import Preview from './components/Preview.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import Insight from './components/Insight.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Coach from './components/Coach.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
 import { translateResume, applyCoachPatch } from './ai.js'
@@ -513,7 +514,13 @@ export default function App() {
             onChangeCover={handleChangeCover}
           />
           <Preview t={t} page={active.page} onFitToggle={handleFitToggle} extraPage={coverNode}>
-            {resumeNode}
+            <ErrorBoundary
+              resetKey={`${active.id}:${active.template}`}
+              message={t.renderError}
+              retryLabel={t.renderRetry}
+            >
+              {resumeNode}
+            </ErrorBoundary>
           </Preview>
           {rightPanel === 'insight' && (
             <Insight
@@ -560,8 +567,10 @@ export default function App() {
       )}
       {/* Untransformed copy used only by @media print */}
       <div id="print-root" aria-hidden="true">
-        <div className="print-page">{resumeNode}</div>
-        {coverNode && <div className="print-page">{coverNode}</div>}
+        <ErrorBoundary resetKey={`${active.id}:${active.template}`} message="" retryLabel="">
+          <div className="print-page">{resumeNode}</div>
+          {coverNode && <div className="print-page">{coverNode}</div>}
+        </ErrorBoundary>
       </div>
     </>
   )

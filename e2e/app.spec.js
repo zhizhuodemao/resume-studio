@@ -2,6 +2,22 @@ import { test, expect } from '@playwright/test'
 
 const openRefine = page => page.getByTestId('refine-btn').click()
 
+// Sequential AI mock: response N answers request N (last one repeats).
+// The agent loop makes follow-up requests after tool executions, so
+// tool-call mocks MUST be followed by a plain-content "done" response.
+const mockAgent = (page, responses) => {
+  let i = 0
+  return page.route('**/api/ai/**', route => {
+    const r = responses[Math.min(i, responses.length - 1)]
+    i += 1
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: r.content || '', tool_calls: r.tool_calls || [] } }] }),
+    })
+  })
+}
+const toolCall = (name, args, id = 'c1') => ({ id, type: 'function', function: { name, arguments: JSON.stringify(args) } })
+
 // Each test gets a fresh browser context (clean localStorage).
 // `?onboarding=0` skips the first-run dialog and loads the default tech sample.
 
@@ -184,19 +200,10 @@ test('assistant health card: hidden when perfect, findings when not', async ({ p
 })
 
 test('assistant coaches: interview turn writes into the resume', async ({ page }) => {
-  await page.route('**/api/ai/**', route =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        choices: [{ message: {
-          content: '很棒！我把这段成果写进了你的简历。下一个问题：这个项目服务了多少用户？',
-          tool_calls: [
-            { id: '1', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '教练更新后的专业简介，突出量化成果。' }) } },
-          ],
-        } }],
-      }),
-    }),
-  )
+  await mockAgent(page, [
+    { content: '', tool_calls: [toolCall('update_resume_content', { summary: '教练更新后的专业简介，突出量化成果。' })] },
+    { content: '很棒！下一个问题：这个项目服务了多少用户？' },
+  ])
   await page.goto('/?onboarding=0')
   const assistant = page.getByTestId('assistant')
   await page.getByTestId('cmd-input').fill('我把转化率提升了 30%')
@@ -204,48 +211,27 @@ test('assistant coaches: interview turn writes into the resume', async ({ page }
   await expect(assistant).toContainText('下一个问题')
   await expect(assistant).toContainText('简介已更新')
   await expect(page.locator('.preview .page')).toContainText('教练更新后的专业简介')
-  // per-turn undo reverts the change
-  await assistant.getByRole('button', { name: '撤销此次修改' }).click()
+  const card = assistant.getByTestId('diff-card').first()
+  await expect(card).toContainText('个人简介')
+  await expect(card).toContainText('教练更新后的专业简介')
+  await card.getByRole('button', { name: '撤销此次修改' }).click()
   await expect(page.locator('.preview .page')).not.toContainText('教练更新后的专业简介')
-  await expect(assistant).toContainText('已撤销')
 })
 
 test('JD tailoring via assistant tool creates and opens a tailored copy', async ({ page }) => {
-  let call = 0
-  await page.route('**/api/ai/**', route => {
-    call += 1
-    if (call === 1) {
-      // assistant turn: user confirms → tool call
-      route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({
-          choices: [{ message: {
-            content: '好的，正在为这个职位生成定制版…',
-            tool_calls: [
-              { id: '1', type: 'function', function: { name: 'create_tailored_version', arguments: JSON.stringify({ jd: '高级前端，要求 React 与 K8s' }) } },
-            ],
-          } }],
-        }),
-      })
-    } else {
-      // tailorResume call
-      route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({
-            basics: { name: '陈嘉禾', title: '高级前端工程师', location: '上海', summary: '为该职位定制的简介' },
-            experience: [], projects: [], education: [], skills: [],
-          }) } }],
-        }),
-      })
-    }
-  })
+  await mockAgent(page, [
+    { content: '好的，正在为这个职位生成定制版…', tool_calls: [toolCall('create_tailored_version', { jd: '高级前端，要求 React 与 K8s' })] },
+    { content: JSON.stringify({
+        basics: { name: '陈嘉禾', title: '高级前端工程师', location: '上海', summary: '为该职位定制的简介' },
+        experience: [], projects: [], education: [], skills: [],
+      }) },
+    { content: '定制版已创建。' },
+  ])
   await page.goto('/?onboarding=0')
   await page.getByTestId('cmd-input').fill('帮我生成这个 JD 的定制版：高级前端，要求 React 与 K8s')
   await page.getByTestId('cmd-input').press('Enter')
   await expect(page.getByTestId('doc-switcher')).toContainText('定制版', { timeout: 10_000 })
   await expect(page.locator('.preview .page')).toContainText('为该职位定制的简介')
-  // original doc unchanged
   await page.getByTestId('doc-switcher').click()
   await page.locator('.docs-item', { hasText: /^我的简历/ }).first().click()
   await expect(page.locator('.preview .page')).not.toContainText('为该职位定制的简介')
@@ -322,27 +308,21 @@ test('slim toolbar: looks live in refine, utilities in the overflow menu', async
   await expect(page.getByRole('button', { name: '清空内容' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'EN' })).toBeVisible()
 })
-test('assistant executes tool calls and supports per-turn undo', async ({ page }) => {
-  await page.route('**/api/ai/**', route =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        choices: [{ message: {
-          content: '好的，已切换到时间线模板并更新了简介。',
-          tool_calls: [
-            { id: '1', type: 'function', function: { name: 'set_template', arguments: '{"template":"timeline"}' } },
-            { id: '2', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '助手更新的简介' }) } },
-          ],
-        } }],
-      }),
-    }),
-  )
+test('assistant executes tool calls with live canvas highlight and undo', async ({ page }) => {
+  await mockAgent(page, [
+    { content: '', tool_calls: [
+      toolCall('set_template', { template: 'timeline' }, 'c1'),
+      toolCall('update_resume_content', { summary: '助手更新的简介' }, 'c2'),
+    ] },
+    { content: '已切换到时间线模板并更新了简介。' },
+  ])
   await page.goto('/?onboarding=0')
   const input = page.getByTestId('cmd-input')
   await input.fill('换成时间线模板，简介重写一下')
   await input.press('Enter')
   await expect(page.locator('.preview .resume.tpl-timeline')).toHaveCount(1)
   await expect(page.locator('.preview .page')).toContainText('助手更新的简介')
+  await expect(page.locator('.preview .page section.ai-changed').first()).toBeVisible()
   const assistant = page.getByTestId('assistant')
   await expect(assistant).toContainText('时间线')
   await assistant.getByRole('button', { name: '撤销此次修改' }).click()
@@ -381,23 +361,28 @@ test('assistant streams SSE: typed deltas and fragmented tool calls', async ({ p
     'data: [DONE]',
     '',
   ].join('\n\n')
-  await page.route('**/api/ai/**', route =>
-    route.fulfill({ contentType: 'text/event-stream', body: sse }),
-  )
+  let call = 0
+  await page.route('**/api/ai/**', route => {
+    call += 1
+    if (call === 1) route.fulfill({ contentType: 'text/event-stream', body: sse })
+    else
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ choices: [{ message: { content: '已切换到创意模板。' } }] }),
+      })
+  })
   await page.goto('/?onboarding=0')
   const input = page.getByTestId('cmd-input')
   await input.fill('换成创意模板')
   await input.press('Enter')
   const assistant = page.getByTestId('assistant')
   await expect(assistant).toContainText('正在为你切换模板…')
-  // fragmented tool_call reassembled and executed
   await expect(page.locator('.preview .resume.tpl-bold')).toHaveCount(1)
   await expect(assistant).toContainText('创意')
 })
 
-test('account: register, cloud sync roundtrip after wiping local data', async ({ page }) => {
+test('account: register, then restore resumes on a fresh device', async ({ page, browser }) => {
   const email = `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@test.dev`
-  page.on('dialog', d => d.accept())
 
   await page.goto('/?onboarding=0')
   // register through the modal
@@ -414,21 +399,23 @@ test('account: register, cloud sync roundtrip after wiping local data', async ({
   await expect(page.locator('.page')).toContainText('云端同步用户')
   await page.waitForTimeout(2300)
 
-  // wipe local storage entirely (token + resume data) and reload
-  await page.evaluate(() => localStorage.clear())
-  await page.reload()
-  await expect(page.getByTestId('account-btn')).toBeVisible() // logged out
-  await expect(page.locator('.page')).not.toContainText('云端同步用户')
+  // brand-new browser context = fresh device with empty storage
+  const ctx2 = await browser.newContext()
+  const page2 = await ctx2.newPage()
+  page2.on('dialog', d => d.accept())
+  await page2.goto('http://localhost:5199/?onboarding=0')
+  await expect(page2.getByTestId('account-btn')).toBeVisible() // logged out
+  await expect(page2.locator('.page')).not.toContainText('云端同步用户')
 
-  // log back in — dialog auto-accepted → cloud state restored
-  await page.getByTestId('account-btn').click()
-  await page.getByTestId('account-email').fill(email)
-  await page.getByTestId('account-password').fill('secret123')
-  await page.getByTestId('account-submit').click()
-  await expect(page.locator('.page')).toContainText('云端同步用户', { timeout: 10_000 })
-  await expect(page.getByTestId('account-menu-btn')).toBeVisible()
+  // log in — cloud-restore dialog auto-accepted → resumes appear
+  await page2.getByTestId('account-btn').click()
+  await page2.getByTestId('account-email').fill(email)
+  await page2.getByTestId('account-password').fill('secret123')
+  await page2.getByTestId('account-submit').click()
+  await expect(page2.locator('.page')).toContainText('云端同步用户', { timeout: 10_000 })
+  await expect(page2.getByTestId('account-menu-btn')).toBeVisible()
+  await ctx2.close()
 })
-
 test('guest trial exhaustion prompts signup and opens the login modal', async ({ page }) => {
   await page.route('**/api/ai/**', route =>
     route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'guest_trial_exhausted' }) }),
@@ -442,19 +429,10 @@ test('guest trial exhaustion prompts signup and opens the login modal', async ({
 })
 
 test('guest conversion nudge appears after a successful AI edit', async ({ page }) => {
-  await page.route('**/api/ai/chat/**', route =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        choices: [{ message: {
-          content: '已更新。',
-          tool_calls: [
-            { id: '1', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '游客体验的新简介' }) } },
-          ],
-        } }],
-      }),
-    }),
-  )
+  await mockAgent(page, [
+    { content: '', tool_calls: [toolCall('update_resume_content', { summary: '游客体验的新简介' })] },
+    { content: '已更新。' },
+  ])
   await page.goto('/?onboarding=0')
   await expect(page.getByTestId('guest-chip')).toContainText('体验模式')
   await page.getByTestId('cmd-input').fill('改一下简介')
@@ -485,56 +463,66 @@ test('assistant bubbles render markdown instead of raw asterisks', async ({ page
   await expect(assistant).not.toContainText('**')
 })
 
-test('agent guardrail: narrated edit without tools triggers a forced action retry', async ({ page }) => {
-  let call = 0
-  await page.route('**/api/ai/**', route => {
-    call += 1
-    const msg =
-      call === 1
-        ? { content: '好的，个人简介已更新为更有冲击力的版本。', tool_calls: [] }
-        : {
-            content: '已通过工具完成修改。',
-            tool_calls: [
-              { id: '1', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '守护机制写入的简介' }) } },
-            ],
-          }
-    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: msg }] }) })
-  })
+test('agent insurance: narrated edit without tools triggers a forced action retry', async ({ page }) => {
+  await mockAgent(page, [
+    { content: '好的，个人简介已更新为更有冲击力的版本。' },
+    { content: '', tool_calls: [toolCall('update_resume_content', { summary: '守护机制写入的简介' })] },
+    { content: '这次真的更新好了。' },
+  ])
   await page.goto('/?onboarding=0')
   await page.getByTestId('cmd-input').fill('帮我修改个人简介')
   await page.getByTestId('cmd-input').press('Enter')
-  // the retry actually executed the tool
   await expect(page.locator('.preview .page')).toContainText('守护机制写入的简介')
-  expect(call).toBe(2)
   await expect(page.getByTestId('assistant')).toContainText('简介已更新')
 })
 
-test('education edits flow through the tool and label honestly', async ({ page }) => {
-  let call = 0
-  await page.route('**/api/ai/**', route => {
-    call += 1
-    const msg =
-      call === 1
-        ? {
-            // first attempt: bad index → no-op → guardrail must force a retry
-            content: '已更新教育经历。',
-            tool_calls: [
-              { id: '1', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ education: [{ index: 9, school: '清华大学' }] }) } },
-            ],
-          }
-        : {
-            content: '已修正为正确的条目。',
-            tool_calls: [
-              { id: '2', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ education: [{ index: 0, school: '清华大学' }] }) } },
-            ],
-          }
-    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: msg }] }) })
-  })
+test('agent self-corrects a bad index from the tool result feedback', async ({ page }) => {
+  await mockAgent(page, [
+    { content: '', tool_calls: [toolCall('update_resume_content', { education: [{ index: 9, school: '清华大学' }] })] },
+    { content: '', tool_calls: [toolCall('update_resume_content', { education: [{ index: 0, school: '清华大学' }] })] },
+    { content: '教育经历已改为清华大学。' },
+  ])
   await page.goto('/?onboarding=0')
   await page.getByTestId('cmd-input').fill('教育经历改成清华大学')
   await page.getByTestId('cmd-input').press('Enter')
   await expect(page.locator('.preview .page')).toContainText('清华大学')
   await expect(page.locator('.preview .page')).not.toContainText('浙江大学')
-  expect(call).toBe(2)
-  await expect(page.getByTestId('assistant')).toContainText('教育经历已更新')
+  const card = page.getByTestId('diff-card').first()
+  await expect(card).toContainText('教育经历')
+  await expect(card).toContainText('浙江大学')
+  await expect(card).toContainText('清华大学')
+})
+
+test('review-first mode: canvas untouched until the diff is accepted', async ({ page }) => {
+  await mockAgent(page, [
+    { content: '', tool_calls: [toolCall('update_resume_content', { summary: '待确认的新简介' })] },
+    { content: '修改已准备好，请确认。' },
+  ])
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('review-confirm').click()
+  await page.getByTestId('cmd-input').fill('改一下简介')
+  await page.getByTestId('cmd-input').press('Enter')
+  const card = page.getByTestId('diff-card').first()
+  await expect(card).toContainText('待确认')
+  // canvas NOT changed yet
+  await expect(page.locator('.preview .page')).not.toContainText('待确认的新简介')
+  await card.getByTestId('diff-accept').click()
+  await expect(page.locator('.preview .page')).toContainText('待确认的新简介')
+  await expect(card).toContainText('已采纳')
+})
+
+test('conversation persists across reloads per document', async ({ page }) => {
+  await mockAgent(page, [
+    { content: '', tool_calls: [toolCall('update_resume_content', { summary: '持久化测试简介' })] },
+    { content: '好的，已完成修改。' },
+  ])
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('cmd-input').fill('这轮对话应当在刷新后保留')
+  await page.getByTestId('cmd-input').press('Enter')
+  await expect(page.getByTestId('assistant')).toContainText('已完成修改')
+  await page.reload()
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant).toContainText('这轮对话应当在刷新后保留')
+  await expect(assistant).toContainText('已完成修改')
+  await expect(assistant.getByTestId('diff-card').first()).toContainText('个人简介')
 })

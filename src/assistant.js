@@ -42,7 +42,11 @@ function docContext(doc, t) {
   )
 }
 
-export async function assistantTurn(history, doc, t, uiLang = 'zh', callbacks = {}) {
+// Real agent loop: the model calls tools, SEES each execution result
+// (ok / no-op / error), and keeps going until it decides it's done.
+// `execute` is provided by the app and returns a JSON-able result.
+export async function runAgentLoop({ history, getDoc, t, uiLang = 'zh', execute, callbacks = {}, maxIters = 6 }) {
+  const doc = getDoc()
   const langNote = uiLang === 'zh' ? '始终用中文回复。' : 'Always reply in English.'
   const system =
     '你是「简历工坊」的 AI 助手，同时是一位顶尖的简历教练。用户在左侧与你对话，右侧画布实时渲染简历。' +
@@ -53,27 +57,50 @@ export async function assistantTurn(history, doc, t, uiLang = 'zh', callbacks = 
     '4) 回复口语化、简短（1-3 句 + 必要的列表）。不要重复简历内容原文。\n' +
     '5) 铁律：对简历的任何修改只能通过工具调用完成。绝不在文字回复里粘贴改写后的内容，绝不在没有调用工具的情况下声称"已更新/已修改"。用户要求修改时，直接调用工具，不要先征求确认（除了生成定制版）。\n' +
     '6) update_resume_content 可修改：简介(summary)、基本信息(basics)、工作经历(experience)、项目(projects)、教育经历(education)——均按简历摘要中的序号 工作[i]/项目[i]/教育[i] 定位；新增条目用 experience_add/education_add/projects_add/skills_add。\n' +
+    '7) 每次工具调用后你会收到 JSON 执行结果：ok=true 表示已生效（changed 列出实际修改的板块）；ok=false 表示没有产生任何修改（hint 说明原因，如序号不存在、字段不支持、内容与原文相同）——此时修正参数重试，不要重复相同的调用。全部完成后用一句话总结，不要罗列修改内容原文。\n' +
     langNote +
     '\n\n' +
     docContext(doc, t)
 
-  const { content, toolCalls } = await chatStream(
-    {
-      model: MODEL,
-      messages: [{ role: 'system', content: system }, ...history.slice(-14)],
-      tools: ASSISTANT_TOOLS,
-      tool_choice: 'auto',
-    },
-    callbacks,
-  )
-  const actions = []
-  for (const call of toolCalls) {
-    if (!call.name) continue
-    try {
-      actions.push({ name: call.name, args: JSON.parse(call.arguments || '{}') })
-    } catch {
-      /* skip malformed tool call */
+  const messages = [{ role: 'system', content: system }, ...history.slice(-14)]
+  const texts = []
+  let acted = false
+
+  for (let iter = 0; iter < maxIters; iter++) {
+    const { content, toolCalls } = await chatStream(
+      { model: MODEL, messages, tools: ASSISTANT_TOOLS, tool_choice: 'auto' },
+      callbacks,
+    )
+    if (content.trim()) texts.push(content.trim())
+    if (!toolCalls.length) break
+
+    messages.push({
+      role: 'assistant',
+      content: content || '',
+      tool_calls: toolCalls.map((c, i) => ({
+        id: c.id || `call_${iter}_${i}`,
+        type: 'function',
+        function: { name: c.name, arguments: c.arguments },
+      })),
+    })
+
+    for (let i = 0; i < toolCalls.length; i++) {
+      const call = toolCalls[i]
+      const id = call.id || `call_${iter}_${i}`
+      let args = {}
+      let result
+      try {
+        args = JSON.parse(call.arguments || '{}')
+      } catch {
+        result = { ok: false, hint: 'arguments 不是合法 JSON' }
+      }
+      if (!result) result = await execute({ name: call.name, args })
+      if (result.ok) acted = true
+      messages.push({ role: 'tool', tool_call_id: id, content: JSON.stringify(result) })
     }
+    // separate streamed text between iterations
+    if (callbacks.onDelta && texts.length) callbacks.onDelta('')
   }
-  return { message: content.trim(), actions }
+
+  return { message: texts.join('\n\n'), acted }
 }

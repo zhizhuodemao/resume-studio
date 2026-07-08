@@ -21,7 +21,8 @@ import { downloadDocx, downloadText } from './exporters.js'
 import * as api from './api.js'
 import AccountModal from './components/AccountModal.jsx'
 import { applyCommandAction } from './commander.js'
-import { assistantTurn } from './assistant.js'
+import { runAgentLoop } from './assistant.js'
+import { diffDocs } from './diff.js'
 import Assistant from './components/Assistant.jsx'
 
 let loadedFresh = false
@@ -129,6 +130,19 @@ export default function App() {
     return () => clearTimeout(saveTimer.current)
   }, [state])
 
+  // Flush pending autosave on reload/close so debounce can't lose state
+  useEffect(() => {
+    const flush = () => {
+      try {
+        savePersistedState(stateRef.current)
+      } catch {
+        /* storage full */
+      }
+    }
+    window.addEventListener('beforeunload', flush)
+    return () => window.removeEventListener('beforeunload', flush)
+  }, [])
+
   /* ---------- Account session ---------- */
   useEffect(() => {
     if (!api.getToken()) return
@@ -155,6 +169,8 @@ export default function App() {
         if (cloud?.state) {
           if (window.confirm(t.account.confirmLoadCloud)) {
             savePersistedState(cloud.state)
+            // keep the unload flush from overwriting the restored state
+            stateRef.current = cloud.state
             window.location.reload()
             return
           }
@@ -433,93 +449,88 @@ export default function App() {
     [patchDoc],
   )
 
-  /* ---------- Unified AI assistant ---------- */
+  /* ---------- Unified AI assistant (real agent loop) ---------- */
+  const [reviewMode, setReviewMode] = useState(() => localStorage.getItem('rs-review-mode') || 'auto')
+  const toggleReviewMode = useCallback(mode => {
+    setReviewMode(mode)
+    localStorage.setItem('rs-review-mode', mode)
+  }, [])
+
+  const snapshotOf = doc => ({
+    template: doc.template,
+    accent: doc.accent,
+    typography: doc.typography,
+    page: doc.page,
+    resume: doc.resume,
+    coverLetter: doc.coverLetter,
+  })
+
   const runAssistantTurn = useCallback(
     async (history, callbacks) => {
       const s0 = stateRef.current
       const doc = s0.resumes.find(d => d.id === s0.activeId)
-      if (!doc) return { message: '', labels: [], snapshot: null }
-      let turn = await assistantTurn(history, doc, t, s0.lang, callbacks)
-      // Agent guardrail: the model sometimes narrates an edit without
-      // calling any tool. Catch the claim and force one action retry.
-      const CLAIM = /已(更新|修改|切换|调整|写入|替换|完成)|updated|changed|switched/i
-      const retryWith = async nudge => {
-        callbacks?.onDelta?.('\n\n')
-        return assistantTurn(
-          [...history, { role: 'assistant', content: turn.message }, { role: 'user', content: nudge }],
-          doc,
-          t,
-          s0.lang,
-          callbacks,
-        )
-      }
-      if (!turn.actions.length && CLAIM.test(turn.message)) {
-        turn = await retryWith(t.assistant.actNudge)
-      } else if (turn.actions.length) {
-        // dry-run the content actions: if every tool call is a no-op
-        // (unsupported field / bad index), force one corrected retry
-        let effective = false
-        let probe = { ...doc }
-        for (const a of turn.actions) {
-          if (a.name === 'translate_resume' || a.name === 'create_tailored_version') {
-            effective = true
-            break
-          }
-          const res = applyCommandAction(probe, a, t)
-          if (res) {
-            effective = true
-            break
-          }
-        }
-        if (!effective) turn = await retryWith(t.assistant.noopNudge)
-      }
-      const { message, actions } = turn
-      const snapshot = {
-        template: doc.template,
-        accent: doc.accent,
-        typography: doc.typography,
-        page: doc.page,
-        resume: doc.resume,
-        coverLetter: doc.coverLetter,
-      }
+      if (!doc) return { message: '', diff: [], snapshot: null, pending: null }
+      const before = snapshotOf(doc)
+      const live = reviewMode === 'auto'
       let cur = { ...doc }
-      const labels = []
-      let wantsFit = false
-      let translateTarget = null
-      let tailorJd = null
-      for (const a of actions) {
-        if (a.name === 'translate_resume') {
-          translateTarget = a.args?.target === 'en' ? 'en' : 'zh'
-          continue
+      let historyPushed = false
+      let seq = 0
+
+      const applyLive = () => {
+        if (!historyPushed) {
+          pushHistory(s0.activeId, before.resume)
+          historyPushed = true
         }
-        if (a.name === 'create_tailored_version') {
-          if (typeof a.args?.jd === 'string' && a.args.jd.trim()) tailorJd = a.args.jd
-          continue
-        }
-        const res = applyCommandAction(cur, a, t)
-        if (res) {
-          cur = res.doc
-          labels.push(res.label)
-          if (res.wantsFit) wantsFit = true
-        }
+        patchDoc(snapshotOf(cur))
       }
-      if (translateTarget) {
-        cur = { ...cur, resume: await translateResume(cur.resume, translateTarget) }
-        labels.push(t.cmd.labels.translate)
-      }
-      const changed = labels.length > 0
-      if (changed) {
-        pushHistory(s0.activeId, doc.resume)
-        patchDoc({
-          template: cur.template,
-          accent: cur.accent,
-          typography: cur.typography,
-          page: cur.page,
-          resume: cur.resume,
-          coverLetter: cur.coverLetter,
-        })
-        window.dispatchEvent(new CustomEvent('ai-updated'))
-        if (wantsFit) {
+
+      const execute = async ({ name, args }) => {
+        const actionId = `a${seq++}`
+        if (name === 'translate_resume') {
+          const target = args?.target === 'en' ? 'en' : 'zh'
+          callbacks?.onAction?.({ id: actionId, label: t.cmd.labels.translate, status: 'running' })
+          try {
+            cur = { ...cur, resume: await translateResume(cur.resume, target) }
+            if (live) applyLive()
+            callbacks?.onAction?.({ id: actionId, label: t.cmd.labels.translate, status: 'done' })
+            return { ok: true, changed: ['resume'] }
+          } catch (err) {
+            console.error(err)
+            callbacks?.onAction?.({ id: actionId, label: t.cmd.labels.translate, status: 'failed' })
+            return { ok: false, hint: '翻译服务出错' }
+          }
+        }
+        if (name === 'create_tailored_version') {
+          if (typeof args?.jd !== 'string' || !args.jd.trim()) return { ok: false, hint: '缺少 jd 参数' }
+          callbacks?.onAction?.({ id: actionId, label: t.cmd.labels.tailored, status: 'running' })
+          try {
+            const tailored = await tailorResume(cur.resume, args.jd, s0.lang)
+            const copy = makeDoc({
+              ...cur,
+              name: `${doc.name || t.docs.untitled} · ${t.docs.tailoredSuffix}`,
+              resume: tailored,
+            })
+            setState(prev => ({ ...prev, resumes: [...prev.resumes, copy], activeId: copy.id }))
+            callbacks?.onAction?.({ id: actionId, label: t.cmd.labels.tailored, status: 'done' })
+            return { ok: true, changed: ['tailored_doc'] }
+          } catch (err) {
+            console.error(err)
+            callbacks?.onAction?.({ id: actionId, label: t.cmd.labels.tailored, status: 'failed' })
+            return { ok: false, hint: '定制生成失败' }
+          }
+        }
+        const res = applyCommandAction(cur, { name, args }, t)
+        if (!res) {
+          callbacks?.onAction?.({ id: actionId, label: `${name}`, status: 'failed' })
+          return {
+            ok: false,
+            hint: '未产生任何修改：字段不支持、序号不存在或内容与原文相同。对照摘要中的 工作[i]/项目[i]/教育[i] 序号。',
+          }
+        }
+        cur = res.doc
+        if (live) applyLive()
+        callbacks?.onAction?.({ id: actionId, label: res.label, status: 'done' })
+        if (res.wantsFit) {
           setTimeout(() => {
             const m = measureRef.current
             if (m.content > m.page) {
@@ -528,18 +539,59 @@ export default function App() {
             }
           }, 450)
         }
+        return { ok: true, changed: res.label.split('、') }
       }
-      if (tailorJd) {
-        const tailored = await tailorResume(cur.resume, tailorJd, s0.lang)
-        const copy = makeDoc({
-          ...cur,
-          name: `${doc.name || t.docs.untitled} · ${t.docs.tailoredSuffix}`,
-          resume: tailored,
+
+      let { message } = await runAgentLoop({
+        history,
+        getDoc: () => doc,
+        t,
+        uiLang: s0.lang,
+        execute,
+        callbacks,
+      })
+
+      // Insurance: model narrated "updated" without any effective action
+      const CLAIM = /已(更新|修改|切换|调整|写入|替换|完成)|updated|changed|switched/i
+      if (!diffDocs(before, cur, t).length && CLAIM.test(message)) {
+        callbacks?.onDelta?.('\n\n')
+        const retry = await runAgentLoop({
+          history: [...history, { role: 'assistant', content: message }, { role: 'user', content: t.assistant.actNudge }],
+          getDoc: () => doc,
+          t,
+          uiLang: s0.lang,
+          execute,
+          callbacks,
         })
-        setState(prev => ({ ...prev, resumes: [...prev.resumes, copy], activeId: copy.id }))
-        labels.push(t.cmd.labels.tailored)
+        if (retry.message) message = retry.message
       }
-      return { message, labels, snapshot: changed ? snapshot : null }
+
+      const diff = diffDocs(before, cur, t)
+      const changedSections = [...new Set(diff.map(r => r.section.split(' · ')[0]))]
+      if (diff.length && live) {
+        window.dispatchEvent(new CustomEvent('ai-updated', { detail: { labels: changedSections } }))
+      }
+      return {
+        message,
+        diff,
+        snapshot: diff.length && live ? before : null,
+        pending: diff.length && !live ? snapshotOf(cur) : null,
+      }
+    },
+    [t, reviewMode, pushHistory, patchDoc],
+  )
+
+  const handleApplyPending = useCallback(
+    pending => {
+      const s0 = stateRef.current
+      const doc = s0.resumes.find(d => d.id === s0.activeId)
+      if (!doc) return null
+      const before = snapshotOf(doc)
+      pushHistory(s0.activeId, before.resume)
+      patchDoc(pending)
+      const changed = [...new Set(diffDocs(before, pending, t).map(r => r.section.split(' · ')[0]))]
+      window.dispatchEvent(new CustomEvent('ai-updated', { detail: { labels: changed } }))
+      return before
     },
     [t, pushHistory, patchDoc],
   )
@@ -647,6 +699,9 @@ export default function App() {
             authUser={authUser}
             onRunTurn={runAssistantTurn}
             onUndoSnapshot={handleUndoSnapshot}
+            onApplyPending={handleApplyPending}
+            reviewMode={reviewMode}
+            onToggleReviewMode={toggleReviewMode}
             initialMessage={pendingJd ? t.assistant.jdIntro(pendingJd) : null}
             onInitialSent={() => setPendingJd(null)}
           />

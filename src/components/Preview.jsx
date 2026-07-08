@@ -13,14 +13,36 @@ export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, on
 
   useEffect(() => {
     let timer
-    const onAi = () => {
+    const findSection = label => {
+      for (const sec of document.querySelectorAll('.preview .page section')) {
+        if (sec.querySelector('h2')?.textContent?.trim() === label) return sec
+      }
+      return null
+    }
+    const onAi = e => {
       setAiFlash(true)
       clearTimeout(timer)
       timer = setTimeout(() => setAiFlash(false), 1400)
+      // mark each changed section on the canvas
+      for (const label of e.detail?.labels || []) {
+        const sec = findSection(label)
+        if (!sec) continue
+        sec.classList.add('ai-changed')
+        setTimeout(() => sec.classList.remove('ai-changed'), 3000)
+      }
+    }
+    const onFocus = e => {
+      const sec = findSection(e.detail)
+      if (!sec) return
+      sec.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      sec.classList.add('ai-changed')
+      setTimeout(() => sec.classList.remove('ai-changed'), 2000)
     }
     window.addEventListener('ai-updated', onAi)
+    window.addEventListener('canvas-focus', onFocus)
     return () => {
       window.removeEventListener('ai-updated', onAi)
+      window.removeEventListener('canvas-focus', onFocus)
       clearTimeout(timer)
     }
   }, [])

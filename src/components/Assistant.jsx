@@ -180,6 +180,7 @@ export default function Assistant({
   onSaveJdReport,
   reviewMode,
   onToggleReviewMode,
+  panelWidth,
   initialMessage,
   onInitialSent,
 }) {
@@ -395,31 +396,54 @@ export default function Assistant({
   const scoreColor = report.score >= 85 ? '#12b76a' : report.score >= 65 ? '#f59e0b' : '#ef4444'
 
   return (
-    <aside className="assistant" data-testid="assistant">
-      {report.findings.length > 0 && (
-        <div className="assistant-health" onClick={() => setShowFindings(v => !v)}>
-          <span className="assistant-score" style={{ color: scoreColor }}>
-            {report.score}
+    <aside className="assistant" data-testid="assistant" style={panelWidth ? { width: panelWidth } : undefined}>
+      <div className="status-strip">
+        <button
+          className={`strip-seg ${showFindings ? 'open' : ''}`}
+          data-testid="health-btn"
+          disabled={!report.findings.length}
+          onClick={() => setShowFindings(v => !v)}
+        >
+          <span className="strip-label">{t.strip.health}</span>
+          {report.findings.length ? (
+            <>
+              <span className="strip-value" style={{ color: scoreColor }}>
+                {report.score}
+              </span>
+              <span className="strip-sub">{t.strip.issues(report.findings.length)}</span>
+            </>
+          ) : (
+            <span className="strip-value strip-ok">✓</span>
+          )}
+        </button>
+        <button
+          className={`strip-seg ${showCoverage ? 'open' : ''}`}
+          data-testid="coverage-btn"
+          onClick={() => setShowCoverage(v => !v)}
+        >
+          <span className="strip-label">{t.strip.coach}</span>
+          <span className="strip-value">
+            {coverage.filter(a => a.status === 'good').length}/{coverage.length}
           </span>
-          <span className="assistant-health-text">{t.assistant.findings(report.findings.length)}</span>
-          <span className="assistant-health-toggle">{showFindings ? '▾' : '▸'}</span>
-        </div>
-      )}
+        </button>
+        <button
+          className={`strip-seg ${showJd ? 'open' : ''} ${doc.jd ? 'strip-seg-set' : ''}`}
+          data-testid="jd-btn"
+          onClick={() => setShowJd(v => !v)}
+        >
+          <span className="strip-label">🎯</span>
+          <span className="strip-value strip-jd">
+            {doc.jd ? t.jdPanel.set : t.jdPanel.unset}
+            {doc.jdReport ? ` · ${doc.jdReport.score}` : ''}
+          </span>
+        </button>
+      </div>
       {!authUser && guestQuota && (
         <div className="guest-chip" data-testid="guest-chip">
           <span>{t.assistant.guestMode(guestQuota.remaining)}</span>
           <button onClick={() => window.dispatchEvent(new CustomEvent('open-login'))}>{t.account.login}</button>
         </div>
       )}
-      <div className="assistant-meta-row">
-        <button className={`meta-chip ${showCoverage ? 'open' : ''}`} onClick={() => setShowCoverage(v => !v)} data-testid="coverage-btn">
-          {t.coach.progress} {coverage.filter(a => a.status === 'good').length}/{coverage.length}
-        </button>
-        <button className={`meta-chip ${showJd ? 'open' : ''} ${doc.jd ? 'meta-chip-set' : ''}`} onClick={() => setShowJd(v => !v)} data-testid="jd-btn">
-          🎯 {doc.jd ? t.jdPanel.set : t.jdPanel.unset}
-          {doc.jdReport ? ` · ${doc.jdReport.score}` : ''}
-        </button>
-      </div>
       {showCoverage && (
         <div className="assistant-findings coverage-panel" data-testid="coverage-panel">
           {coverage.map(a => (

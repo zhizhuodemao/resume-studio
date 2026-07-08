@@ -75,13 +75,14 @@ test('multi-resume: create blank, switch back and forth', async ({ page }) => {
 
 test('JSON export downloads and import creates a new doc', async ({ page }) => {
   await page.goto('/?onboarding=0')
-  await page.getByTestId('doc-switcher').click()
+  await page.getByTestId('export-menu-btn').click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '导出 JSON' }).click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toContain('.resume.json')
 
-  // Import a minimal bare-resume JSON as a new document
+  // Import a minimal bare-resume JSON as a new document (docs menu)
+  await page.getByTestId('doc-switcher').click()
   const imported = {
     basics: { name: '导入测试', title: '', email: '', phone: '', location: '', website: '', github: '', photo: '', summary: '' },
     experience: [], projects: [], education: [], skills: [],
@@ -186,17 +187,18 @@ test('fit to one page compresses overflowing content', async ({ page }) => {
   await expect(page.locator('.page-hint')).toContainText('共 2 页')
 })
 
-test('assistant health card: hidden when perfect, findings when not', async ({ page }) => {
+test('status strip: quiet ✓ when perfect, findings expand when not', async ({ page }) => {
   await page.goto('/?onboarding=0')
-  const assistant = page.getByTestId('assistant')
-  // perfect sample resume → no nagging score card at all
-  await expect(assistant.locator('.assistant-health')).toHaveCount(0)
-  // blank doc → the card appears with must-fix findings
+  const health = page.getByTestId('health-btn')
+  // perfect sample resume → quiet ✓, nothing to expand
+  await expect(health).toContainText('✓')
+  await expect(health).toBeDisabled()
+  // blank doc → score + issue count appear, click expands findings
   await page.getByTestId('doc-switcher').click()
   await page.getByRole('button', { name: '新建空白' }).click()
-  await expect(assistant.locator('.assistant-health-text')).toContainText('优化建议')
-  await assistant.locator('.assistant-health').click()
-  await expect(assistant.locator('.assistant-findings')).toContainText('缺少姓名')
+  await expect(health).toContainText('项')
+  await health.click()
+  await expect(page.getByTestId('assistant').locator('.assistant-findings')).toContainText('缺少姓名')
 })
 
 test('assistant coaches: interview turn writes into the resume', async ({ page }) => {
@@ -239,10 +241,11 @@ test('JD tailoring via assistant tool creates and opens a tailored copy', async 
 
 test('Word and TXT export download files', async ({ page }) => {
   await page.goto('/?onboarding=0')
-  await page.getByTestId('doc-switcher').click()
+  await page.getByTestId('export-menu-btn').click()
   const d1 = page.waitForEvent('download')
   await page.getByRole('button', { name: '导出 Word' }).click()
   expect((await d1).suggestedFilename()).toContain('.docx')
+  await page.getByTestId('export-menu-btn').click()
   const d2 = page.waitForEvent('download')
   await page.getByRole('button', { name: '导出 TXT' }).click()
   expect((await d2).suggestedFilename()).toContain('.txt')

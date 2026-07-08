@@ -55,10 +55,10 @@ export default function Toolbar({
   onOpenLogin,
   onLogout,
 }) {
-  // ?menu=template|typo|sample|ai deep-links a panel open
   const initialMenu = new URLSearchParams(window.location.search).get('menu')
   const samplePop = usePopover(initialMenu === 'sample')
   const docsPop = usePopover(initialMenu === 'docs')
+  const exportPop = usePopover(false)
   const importInputRef = useRef(null)
   const [selTrack, setSelTrack] = useState(track || 'tech')
   const [selStage, setSelStage] = useState('social')
@@ -75,8 +75,14 @@ export default function Toolbar({
     if (!accountPop.open) getUsage().then(setUsage).catch(() => setUsage(null))
   }
 
+  const docAction = fn => () => {
+    fn()
+    docsPop.setOpen(false)
+  }
+
   return (
     <header className="toolbar">
+      {/* left: identity + document */}
       <div className="toolbar-brand">
         <div className="brand-mark">R</div>
         <div>
@@ -102,71 +108,62 @@ export default function Toolbar({
                 <button
                   key={d.id}
                   className={`docs-item ${d.id === activeDoc.id ? 'active' : ''}`}
-                  onClick={() => {
-                    onSwitchDoc(d.id)
-                    docsPop.setOpen(false)
-                  }}
+                  onClick={docAction(() => onSwitchDoc(d.id))}
                 >
+                  <span className="docs-check">{d.id === activeDoc.id ? '✓' : ''}</span>
                   <span className="docs-item-name">{d.name || t.docs.untitled}</span>
                   <span className="docs-item-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
                 </button>
               ))}
             </div>
-            <div className="docs-actions">
-              <button className="btn btn-small" onClick={() => { onCreateDoc(); docsPop.setOpen(false) }}>
-                {t.docs.new}
-              </button>
-              <button className="btn btn-small" onClick={() => { onDuplicateDoc(); docsPop.setOpen(false) }}>
-                {t.docs.duplicate}
-              </button>
-              <button className="btn btn-small" onClick={() => { onRenameDoc(); docsPop.setOpen(false) }}>
-                {t.docs.rename}
-              </button>
-              <button className="btn btn-small btn-danger" onClick={() => { onDeleteDoc(); docsPop.setOpen(false) }}>
-                {t.docs.delete}
-              </button>
-            </div>
-            <div className="docs-actions">
-              <button className="btn btn-small" onClick={onExportDoc}>
-                {t.docs.export}
-              </button>
-              <button className="btn btn-small" onClick={onExportDocx}>
-                {t.docs.exportWord}
-              </button>
-              <button className="btn btn-small" onClick={onExportText}>
-                {t.docs.exportText}
-              </button>
-              <button className="btn btn-small" onClick={() => importInputRef.current?.click()}>
-                {t.docs.import}
-              </button>
-              <input
-                ref={importInputRef}
-                type="file"
-                accept=".json,application/json"
-                hidden
-                onChange={e => {
-                  onImportDoc(e.target.files[0])
-                  e.target.value = ''
-                  docsPop.setOpen(false)
-                }}
-              />
-            </div>
+            <div className="menu-divider" />
+            <button className="menu-item" onClick={docAction(onCreateDoc)}>
+              <span className="menu-item-icon">＋</span>
+              {t.docs.new}
+            </button>
+            <button className="menu-item" onClick={docAction(onDuplicateDoc)}>
+              <span className="menu-item-icon">⧉</span>
+              {t.docs.duplicate}
+            </button>
+            <button className="menu-item" onClick={docAction(onRenameDoc)}>
+              <span className="menu-item-icon">✎</span>
+              {t.docs.rename}
+            </button>
+            <button className="menu-item" onClick={() => importInputRef.current?.click()}>
+              <span className="menu-item-icon">⤓</span>
+              {t.docs.import}
+            </button>
+            <div className="menu-divider" />
+            <button className="menu-item menu-item-danger" onClick={docAction(onDeleteDoc)}>
+              <span className="menu-item-icon">🗑</span>
+              {t.docs.delete}
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,application/json"
+              hidden
+              onChange={e => {
+                onImportDoc(e.target.files[0])
+                e.target.value = ''
+                docsPop.setOpen(false)
+              }}
+            />
           </div>
         )}
       </div>
 
-      <div className="undo-group">
+      {/* center: editing tool group */}
+      <div className="toolbar-group">
         <button className="icon-btn toolbar-icon-btn" disabled={!canUndo} title={t.docs.undo} onClick={onUndo}>
           <Icon name="undo" size={15} />
         </button>
         <button className="icon-btn toolbar-icon-btn" disabled={!canRedo} title={t.docs.redo} onClick={onRedo}>
           <Icon name="redo" size={15} />
         </button>
-      </div>
-
-      <div className="toolbar-center">
+        <span className="toolbar-group-divider" />
         <button
-          className={`btn btn-select ${refineOpen ? 'open' : ''}`}
+          className={`btn btn-toolgroup ${refineOpen ? 'open' : ''}`}
           onClick={onToggleRefine}
           data-testid="refine-btn"
         >
@@ -174,10 +171,19 @@ export default function Toolbar({
         </button>
       </div>
 
+      <div className="toolbar-spacer" />
+
+      {/* right: status + utilities + account + export */}
       <div className="toolbar-actions">
-        {savedAt && (
-          <span className="saved-indicator" title={`${t.autoSaved} ${savedAt.toLocaleTimeString()}`} />
-        )}
+        <span
+          className={`sync-chip ${authUser ? 'sync-cloud' : ''}`}
+          data-testid="sync-chip"
+          title={savedAt ? `${t.autoSaved} ${savedAt.toLocaleTimeString()}` : ''}
+        >
+          <span className="sync-dot" />
+          {authUser ? t.sync.cloud : t.sync.local}
+        </span>
+
         <div className="popover-wrap" ref={samplePop.ref}>
           <button
             className={`btn btn-ghost more-btn ${samplePop.open ? 'open' : ''}`}
@@ -244,6 +250,7 @@ export default function Toolbar({
             </div>
           )}
         </div>
+
         {authUser ? (
           <div className="popover-wrap" ref={accountPop.ref}>
             <button
@@ -251,7 +258,7 @@ export default function Toolbar({
               onClick={openAccount}
               data-testid="account-menu-btn"
             >
-              <span className="account-dot" />
+              <span className="account-avatar">{authUser.email[0].toUpperCase()}</span>
               {authUser.email.split('@')[0].slice(0, 12)}
             </button>
             {accountPop.open && (
@@ -291,10 +298,34 @@ export default function Toolbar({
             {t.account.login}
           </button>
         )}
-        <button className="btn btn-primary" onClick={onExport} title={t.exportHint}>
-          <Icon name="download" size={15} />
-          {t.exportPdf}
-        </button>
+
+        <div className="export-split popover-wrap" ref={exportPop.ref}>
+          <button className="btn btn-primary export-main" onClick={onExport} title={t.exportHint}>
+            <Icon name="download" size={15} />
+            {t.exportPdf}
+          </button>
+          <button
+            className={`btn btn-primary export-caret ${exportPop.open ? 'open' : ''}`}
+            onClick={() => exportPop.setOpen(!exportPop.open)}
+            data-testid="export-menu-btn"
+            aria-label={t.more}
+          >
+            <Icon name="chevron" size={13} />
+          </button>
+          {exportPop.open && (
+            <div className="popover popover-right popover-menu">
+              <button className="menu-item" onClick={() => { exportPop.setOpen(false); onExportDocx() }}>
+                {t.docs.exportWord}
+              </button>
+              <button className="menu-item" onClick={() => { exportPop.setOpen(false); onExportText() }}>
+                {t.docs.exportText}
+              </button>
+              <button className="menu-item" onClick={() => { exportPop.setOpen(false); onExportDoc() }}>
+                {t.docs.export}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )

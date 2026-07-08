@@ -110,6 +110,24 @@ export default function App() {
   const [authUser, setAuthUser] = useState(null)
   const [loginOpen, setLoginOpen] = useState(false)
   const measureRef = useRef({ content: 0, page: 1123 })
+  const [panelWidth, setPanelWidth] = useState(() => {
+    const w = Number(localStorage.getItem('rs-panel-w'))
+    return w >= 360 && w <= 560 ? w : 420
+  })
+  const startPanelDrag = useCallback(e => {
+    e.preventDefault()
+    const move = ev => setPanelWidth(Math.min(560, Math.max(360, ev.clientX)))
+    const up = ev => {
+      const w = Math.min(560, Math.max(360, ev.clientX))
+      localStorage.setItem('rs-panel-w', String(w))
+      document.removeEventListener('mousemove', move)
+      document.removeEventListener('mouseup', up)
+      document.body.classList.remove('panel-dragging')
+    }
+    document.body.classList.add('panel-dragging')
+    document.addEventListener('mousemove', move)
+    document.addEventListener('mouseup', up)
+  }, [])
   const { lang, resumes, activeId } = state
   const active = resumes.find(d => d.id === activeId) || resumes[0]
   const t = MESSAGES[lang]
@@ -725,9 +743,11 @@ export default function App() {
             onSaveJdReport={jdReport => patchDoc({ jdReport })}
             reviewMode={reviewMode}
             onToggleReviewMode={toggleReviewMode}
+            panelWidth={panelWidth}
             initialMessage={pendingJd ? t.assistant.jdIntro(pendingJd) : null}
             onInitialSent={() => setPendingJd(null)}
           />
+          <div className="panel-resizer" onMouseDown={startPanelDrag} aria-hidden="true" />
           <Preview
             t={t}
             page={active.page}

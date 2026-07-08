@@ -85,6 +85,12 @@ export const MESSAGES = {
       tailoring: '定制生成中…',
       tailored: '已创建定制版简历，并已切换过去',
     },
+    strip: {
+      health: '体检',
+      coach: '教练',
+      issues: n => `${n} 项`,
+    },
+    sync: { local: '已保存', cloud: '云同步' },
     selEdit: {
       button: '改这段',
       prefill: text => `修改画布上选中的这段内容：「${text.slice(0, 200)}」\n要求：`,
@@ -423,6 +429,12 @@ export const MESSAGES = {
       tailoring: 'Tailoring…',
       tailored: 'Tailored resume created and opened',
     },
+    strip: {
+      health: 'Check',
+      coach: 'Coach',
+      issues: n => `${n}`,
+    },
+    sync: { local: 'Saved', cloud: 'Synced' },
     selEdit: {
       button: 'Edit this',
       prefill: text => `Edit this selected passage from the canvas: "${text.slice(0, 200)}"\nRequirement: `,

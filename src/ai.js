@@ -1,10 +1,12 @@
+import { authHeaders } from './api.js'
+
 const AI_ENDPOINT = '/api/ai/chat/completions'
 const MODEL = 'deepseek-chat'
 
 async function chat(messages, opts = {}) {
   const res = await fetch(AI_ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ model: MODEL, messages, stream: false, ...opts }),
   })
   if (!res.ok) {

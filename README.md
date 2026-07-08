@@ -33,9 +33,15 @@
 - Word（.docx）、纯文本（TXT）、JSON 备份导入导出
 - 求职信附加页（含 AI 初稿，随 PDF 一起导出）
 
+**账号与云端**
+
+- 邮箱注册 / 登录（scrypt 哈希 + JWT），简历随账号自动同步云端；换设备登录即恢复
+- AI 按账户计量（今日 / 累计 tokens、调用次数，账户菜单可见），支持免费额度上限，为收费做好数据基础
+- 未登录仍可完整使用编辑 / 模板 / 导出（local-first 不变），AI 功能需登录
+
 **质量**
 
-- 33 个单元测试 + 20 个 Playwright 端到端测试，GitHub Actions CI，模板渲染错误边界
+- 49 个单元测试（含后端集成）+ 27 个 Playwright 端到端测试（含全栈云同步往返），GitHub Actions CI，模板渲染错误边界
 
 ## 使用
 
@@ -47,9 +53,15 @@ npm test           # 单元测试（vitest）
 npm run test:e2e   # 端到端测试（Playwright，本地使用已安装的 Chrome）
 ```
 
-### 部署（Vercel）
+### 后端与部署
 
-项目已包含 `api/ai/[...path].js` serverless AI 代理（与开发代理同路由）。部署步骤：导入仓库到 Vercel → 在项目环境变量中设置 `DEEPSEEK_API_KEY` → 部署。不配置 key 时 AI 功能返回 `ai_not_configured`，其余功能不受影响。
+自带薄后端（`server/`，Express + Node 内置 SQLite，需 Node ≥ 23.4）承担三件事：**账号登录**（scrypt + JWT）、**云端存档**（简历随账号绑定，登录后自动同步）、**AI 计量代理**（登录后才可用 AI；逐次记录 prompt/completion tokens，供后期计费；可用 `AI_TOKEN_LIMIT` 环境变量设置免费额度上限）。
+
+```bash
+npm run server     # 后端：http://localhost:8787（开发时与 npm run dev 并行开两个终端）
+```
+
+生产部署为单进程：`npm run build` 后 `node server/index.js` 同时服务静态页面与 API，可部署到任意 Node 托管（VPS / Railway / Fly / Render）。环境变量：`DEEPSEEK_API_KEY`（AI）、`JWT_SECRET`（必改）、`AI_TOKEN_LIMIT`（可选免费额度）、`PORT`。数据落在 `server/.data/app.db`（SQLite 单文件，备份即拷贝）。
 
 ### AI 功能配置（可选）
 
@@ -59,7 +71,7 @@ npm run test:e2e   # 端到端测试（Playwright，本地使用已安装的 Chr
 DEEPSEEK_API_KEY=sk-xxxx
 ```
 
-开发模式下由 Vite 代理注入 key（浏览器端不可见），路由为 `/api/ai/*`。生产部署时需用同路由的 serverless 函数替代该代理 —— key 永远不能出现在前端代码或构建产物中。
+key 由后端读取（浏览器端不可见），前端一律走 `/api/ai/*` 由后端转发计量 —— key 永远不能出现在前端代码或构建产物中。
 
 ### 导出 PDF
 

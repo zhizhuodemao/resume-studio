@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { TEMPLATE_IDS } from '../templates/Resume.jsx'
 import { SAMPLE_TRACKS, hasStage } from '../samples/index.js'
+import { getUsage } from '../api.js'
 
 const ACCENT_PRESETS = ['#2563eb', '#4f46e5', '#0d9488', '#b45309', '#e11d48', '#334155']
 
@@ -195,6 +196,9 @@ export default function Toolbar({
   onToggleInsight,
   refineOpen,
   onToggleRefine,
+  authUser,
+  onOpenLogin,
+  onLogout,
 }) {
   // ?menu=template|typo|sample|ai deep-links a panel open
   const initialMenu = new URLSearchParams(window.location.search).get('menu')
@@ -213,6 +217,13 @@ export default function Toolbar({
   }
 
   const setTypo = patch => onPatchDoc({ typography: { ...typography, ...patch } })
+
+  const accountPop = usePopover(false)
+  const [usage, setUsage] = useState(null)
+  const openAccount = () => {
+    accountPop.setOpen(!accountPop.open)
+    if (!accountPop.open) getUsage().then(setUsage).catch(() => setUsage(null))
+  }
 
   return (
     <header className="toolbar">
@@ -536,6 +547,53 @@ export default function Toolbar({
             </div>
           )}
         </div>
+        {authUser ? (
+          <div className="popover-wrap" ref={accountPop.ref}>
+            <button
+              className={`btn btn-ghost account-chip ${accountPop.open ? 'open' : ''}`}
+              onClick={openAccount}
+              data-testid="account-menu-btn"
+            >
+              <span className="account-dot" />
+              {authUser.email.split('@')[0].slice(0, 12)}
+            </button>
+            {accountPop.open && (
+              <div className="popover popover-right popover-menu account-menu">
+                <div className="account-email">{authUser.email}</div>
+                <div className="account-usage">
+                  <div>
+                    <b>{usage ? usage.today_tokens.toLocaleString() : '…'}</b>
+                    <span>{t.account.usageToday}</span>
+                  </div>
+                  <div>
+                    <b>{usage ? usage.total_tokens.toLocaleString() : '…'}</b>
+                    <span>{t.account.usageTotal}</span>
+                  </div>
+                  <div>
+                    <b>{usage ? usage.calls : '…'}</b>
+                    <span>{t.account.calls}</span>
+                  </div>
+                </div>
+                <div className="account-sync">{t.account.synced}</div>
+                <div className="menu-divider" />
+                <button
+                  className="menu-item"
+                  data-testid="logout-btn"
+                  onClick={() => {
+                    accountPop.setOpen(false)
+                    onLogout()
+                  }}
+                >
+                  {t.account.logout}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button className="btn btn-ghost" onClick={onOpenLogin} data-testid="account-btn">
+            {t.account.login}
+          </button>
+        )}
         <button className="btn btn-primary" onClick={onExport} title={t.exportHint}>
           <Icon name="download" size={15} />
           {t.exportPdf}

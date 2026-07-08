@@ -11,10 +11,18 @@ export default defineConfig({
     headless: true,
     locale: 'zh-CN',
   },
-  webServer: {
-    command: 'npm run dev -- --port 5199 --strictPort',
-    url: 'http://localhost:5199',
-    reuseExistingServer: true,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: 'node --env-file-if-exists=.env server/index.js',
+      url: 'http://localhost:8787/api/auth/me',
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+    {
+      command: 'npm run dev -- --port 5199 --strictPort',
+      url: 'http://localhost:5199',
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+  ],
 })

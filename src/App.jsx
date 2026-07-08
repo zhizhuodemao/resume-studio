@@ -18,6 +18,8 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
 import { translateResume, tailorResume } from './ai.js'
 import { downloadDocx, downloadText } from './exporters.js'
+import * as api from './api.js'
+import AccountModal from './components/AccountModal.jsx'
 import { applyCommandAction } from './commander.js'
 import { assistantTurn } from './assistant.js'
 import Assistant from './components/Assistant.jsx'
@@ -107,6 +109,8 @@ export default function App() {
   const [mobileView, setMobileView] = useState('edit')
   const [refineOpen, setRefineOpen] = useState(false)
   const [pendingJd, setPendingJd] = useState(null)
+  const [authUser, setAuthUser] = useState(null)
+  const [loginOpen, setLoginOpen] = useState(false)
   const measureRef = useRef({ content: 0, page: 1123 })
   const { lang, resumes, activeId } = state
   const active = resumes.find(d => d.id === activeId) || resumes[0]
@@ -127,6 +131,60 @@ export default function App() {
     }, 400)
     return () => clearTimeout(saveTimer.current)
   }, [state])
+
+  /* ---------- Account session ---------- */
+  useEffect(() => {
+    if (!api.getToken()) return
+    api
+      .me()
+      .then(r => setAuthUser(r.user))
+      .catch(err => {
+        if (err.code === 'auth_required') api.clearToken()
+      })
+  }, [])
+
+  useEffect(() => {
+    const open = () => setLoginOpen(true)
+    window.addEventListener('open-login', open)
+    return () => window.removeEventListener('open-login', open)
+  }, [])
+
+  const handleAuthed = useCallback(
+    async user => {
+      setAuthUser(user)
+      setLoginOpen(false)
+      try {
+        const cloud = await api.pullState()
+        if (cloud?.state) {
+          if (window.confirm(t.account.confirmLoadCloud)) {
+            savePersistedState(cloud.state)
+            window.location.reload()
+            return
+          }
+        }
+        await api.pushState(stateRef.current)
+      } catch (err) {
+        console.error(err)
+      }
+    },
+    [t],
+  )
+
+  const handleLogout = useCallback(() => {
+    api.logout()
+    setAuthUser(null)
+  }, [])
+
+  // Cloud push piggybacks on autosave (debounced a bit longer)
+  const pushTimer = useRef(null)
+  useEffect(() => {
+    if (!authUser) return
+    clearTimeout(pushTimer.current)
+    pushTimer.current = setTimeout(() => {
+      api.pushState(state).catch(err => console.error('cloud push failed', err))
+    }, 1500)
+    return () => clearTimeout(pushTimer.current)
+  }, [state, authUser])
 
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
@@ -603,6 +661,9 @@ export default function App() {
           onToggleInsight={() => setRightPanel(p => (p === 'insight' ? null : 'insight'))}
           refineOpen={refineOpen}
           onToggleRefine={() => setRefineOpen(o => !o)}
+          authUser={authUser}
+          onOpenLogin={() => setLoginOpen(true)}
+          onLogout={handleLogout}
         />
         <div className={`app-body mobile-${mobileView}`}>
           <Assistant
@@ -671,6 +732,7 @@ export default function App() {
         </nav>
       </div>
       {active.page.size === 'letter' && <style>{'@media print { @page { size: letter; margin: 0 } }'}</style>}
+      {loginOpen && <AccountModal t={t} onClose={() => setLoginOpen(false)} onAuthed={handleAuthed} />}
       {onboarding && (
         <Onboarding
           t={t}

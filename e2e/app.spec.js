@@ -405,3 +405,49 @@ test('assistant streams SSE: typed deltas and fragmented tool calls', async ({ p
   await expect(page.locator('.preview .resume.tpl-bold')).toHaveCount(1)
   await expect(assistant).toContainText('创意')
 })
+
+test('account: register, cloud sync roundtrip after wiping local data', async ({ page }) => {
+  const email = `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@test.dev`
+  page.on('dialog', d => d.accept())
+
+  await page.goto('/?onboarding=0')
+  // register through the modal
+  await page.getByTestId('account-btn').click()
+  await page.getByTestId('account-switch').click()
+  await page.getByTestId('account-email').fill(email)
+  await page.getByTestId('account-password').fill('secret123')
+  await page.getByTestId('account-submit').click()
+  await expect(page.getByTestId('account-menu-btn')).toBeVisible()
+
+  // make an identifiable edit and let autosave + cloud push run
+  await openRefine(page)
+  await page.getByLabel('姓名').fill('云端同步用户')
+  await expect(page.locator('.page')).toContainText('云端同步用户')
+  await page.waitForTimeout(2300)
+
+  // wipe local storage entirely (token + resume data) and reload
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await expect(page.getByTestId('account-btn')).toBeVisible() // logged out
+  await expect(page.locator('.page')).not.toContainText('云端同步用户')
+
+  // log back in — dialog auto-accepted → cloud state restored
+  await page.getByTestId('account-btn').click()
+  await page.getByTestId('account-email').fill(email)
+  await page.getByTestId('account-password').fill('secret123')
+  await page.getByTestId('account-submit').click()
+  await expect(page.locator('.page')).toContainText('云端同步用户', { timeout: 10_000 })
+  await expect(page.getByTestId('account-menu-btn')).toBeVisible()
+})
+
+test('AI is gated behind login with a friendly prompt', async ({ page }) => {
+  // no route mock and not logged in → backend returns 401
+  await page.goto('/?onboarding=0')
+  const input = page.getByTestId('cmd-input')
+  await input.fill('帮我润色简介')
+  await input.press('Enter')
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant).toContainText('AI 功能需要登录后使用')
+  // login modal auto-opened
+  await expect(page.getByTestId('account-submit')).toBeVisible()
+})

@@ -3,6 +3,8 @@
 // (function-call arguments arrive as index-keyed JSON slices that must
 // be reassembled before execution).
 
+import { authHeaders } from './api.js'
+
 const AI_ENDPOINT = '/api/ai/chat/completions'
 
 // Pure, chunk-boundary-safe assembler — unit-testable without fetch.
@@ -54,13 +56,16 @@ export function createChunkAssembler() {
 export async function chatStream(body, { onDelta, onToolCall, signal } = {}) {
   const res = await fetch(AI_ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ ...body, stream: true }),
     signal,
   })
   if (!res.ok) {
     const errBody = await res.text().catch(() => '')
-    throw new Error(`AI request failed: ${res.status} ${errBody.slice(0, 200)}`)
+    const err = new Error(`AI request failed: ${res.status} ${errBody.slice(0, 200)}`)
+    if (res.status === 401) err.code = 'auth_required'
+    if (res.status === 429) err.code = errBody.includes('quota_exceeded') ? 'quota_exceeded' : err.code
+    throw err
   }
 
   const ctype = res.headers.get('content-type') || ''

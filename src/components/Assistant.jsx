@@ -77,7 +77,14 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
       })
     } catch (err) {
       console.error(err)
-      finalize({ role: 'assistant', content: t.ai.error, error: true })
+      if (err.code === 'auth_required') {
+        finalize({ role: 'assistant', content: t.account.needLogin })
+        window.dispatchEvent(new CustomEvent('open-login'))
+      } else if (err.code === 'quota_exceeded') {
+        finalize({ role: 'assistant', content: t.account.quotaExceeded, error: true })
+      } else {
+        finalize({ role: 'assistant', content: t.ai.error, error: true })
+      }
     } finally {
       setBusy(false)
     }

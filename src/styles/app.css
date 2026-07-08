@@ -2286,3 +2286,103 @@ details[open] > summary .section-chevron {
   align-items: center;
   gap: 5px;
 }
+
+/* Account */
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 150px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.account-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #12b76a;
+  flex-shrink: 0;
+}
+
+.account-menu {
+  min-width: 230px;
+}
+
+.account-email {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px 2px;
+  word-break: break-all;
+}
+
+.account-usage {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.account-usage > div {
+  flex: 1;
+  background: #f7f8fa;
+  border-radius: 8px;
+  padding: 8px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-usage b {
+  font-size: 13px;
+}
+
+.account-usage span {
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.account-sync {
+  font-size: 11px;
+  color: #12b76a;
+  padding: 0 12px 4px;
+}
+
+.account-card h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.account-card .field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.account-card .field span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 5px;
+}
+
+.account-card input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  outline: none;
+}
+
+.account-card input:focus {
+  border-color: var(--ink);
+}
+
+.account-error {
+  font-size: 12.5px;
+  color: #d92d20;
+  background: #fef3f2;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}

@@ -313,7 +313,7 @@ function SectionCard({ t, title, sectionKey, resume, setResume, children, onRena
 
 const CUSTOM_PRESETS = ['certificate', 'language', 'award', 'volunteer', 'custom']
 
-export default function Editor({ t, resume, setResume, placeholders, coverLetter, onChangeCover }) {
+export default function Editor({ t, resume, setResume, placeholders, coverLetter, onChangeCover, onConfirm }) {
   const f = t.fields
   const ph = placeholders || {}
   const setBasics = patch => setResume(r => ({ ...r, basics: { ...r.basics, ...patch } }))
@@ -454,7 +454,7 @@ export default function Editor({ t, resume, setResume, placeholders, coverLetter
         dnd={dnd}
         onRename={v => customOps.rename(sec.id, v)}
         onDelete={() => {
-          if (window.confirm(t.customSec.confirmDelete)) customOps.remove(sec.id)
+          onConfirm?.(t.customSec.confirmDelete, { danger: true }).then(ok => ok && customOps.remove(sec.id))
         }}
       >
         {sec.items.map((item, i) => {

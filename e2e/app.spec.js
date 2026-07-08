@@ -305,11 +305,11 @@ test('slim toolbar: looks live in refine, utilities in the overflow menu', async
   await page.getByTestId('looks-tab').click()
   await expect(page.getByTestId('appearance-panel')).toContainText('模板')
   await expect(page.getByTestId('appearance-panel').locator('.accent-swatch').first()).toBeVisible()
-  // overflow menu keeps sample/clear/language
+  // labeled sample-library menu keeps load/clear; language is standalone
+  await expect(page.locator('.toolbar').getByRole('button', { name: 'EN' })).toBeVisible()
   await page.getByTestId('more-btn').click()
   await expect(page.getByRole('button', { name: '载入示例' })).toBeVisible()
   await expect(page.getByRole('button', { name: '清空内容' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'EN' })).toBeVisible()
 })
 test('assistant executes tool calls with live canvas highlight and undo', async ({ page }) => {
   await mockAgent(page, [
@@ -405,7 +405,6 @@ test('account: register, then restore resumes on a fresh device', async ({ page,
   // brand-new browser context = fresh device with empty storage
   const ctx2 = await browser.newContext()
   const page2 = await ctx2.newPage()
-  page2.on('dialog', d => d.accept())
   await page2.goto('http://localhost:5199/?onboarding=0')
   await expect(page2.getByTestId('account-btn')).toBeVisible() // logged out
   await expect(page2.locator('.page')).not.toContainText('云端同步用户')
@@ -415,6 +414,8 @@ test('account: register, then restore resumes on a fresh device', async ({ page,
   await page2.getByTestId('account-email').fill(email)
   await page2.getByTestId('account-password').fill('secret123')
   await page2.getByTestId('account-submit').click()
+  // in-app dialog offers the cloud restore — accept it
+  await page2.getByTestId('dialog-ok').click()
   await expect(page2.locator('.page')).toContainText('云端同步用户', { timeout: 10_000 })
   await expect(page2.getByTestId('account-menu-btn')).toBeVisible()
   await ctx2.close()
@@ -641,4 +642,37 @@ test('conversation identity: user right-aligned dark, assistant left with avatar
   expect(geo.aiGapLeft).toBeLessThan(60)
   expect(geo.aiHasAvatar).toBe(true)
   expect(geo.avatarBesideBubble).toBe(true)
+})
+
+test('rename is inline in the docs menu — no native prompt', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('doc-switcher').click()
+  await page.getByRole('button', { name: '重命名' }).click()
+  const input = page.getByTestId('rename-input')
+  await expect(input).toBeFocused()
+  await input.fill('投递字节的简历')
+  await input.press('Enter')
+  await expect(page.getByTestId('doc-switcher')).toContainText('投递字节的简历')
+  // Escape cancels without renaming
+  await page.getByRole('button', { name: '重命名' }).click()
+  await page.getByTestId('rename-input').fill('不要这个名字')
+  await page.getByTestId('rename-input').press('Escape')
+  await expect(page.getByTestId('doc-switcher')).toContainText('投递字节的简历')
+})
+
+test('delete and clear use the in-app confirm dialog', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  // delete flow: cancel keeps the doc
+  await page.getByTestId('doc-switcher').click()
+  await page.getByRole('button', { name: '删除' }).click()
+  const dialog = page.getByTestId('app-dialog')
+  await expect(dialog).toContainText('删除这份简历')
+  await page.getByTestId('dialog-cancel').click()
+  await expect(page.getByTestId('doc-switcher')).toContainText('我的简历')
+  // clear flow: confirm empties the canvas
+  await page.getByTestId('more-btn').click()
+  await page.getByRole('button', { name: '清空内容' }).click()
+  await expect(page.getByTestId('app-dialog')).toContainText('清空')
+  await page.getByTestId('dialog-ok').click()
+  await expect(page.locator('.page')).not.toContainText('陈嘉禾')
 })

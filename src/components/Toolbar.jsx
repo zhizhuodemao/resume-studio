@@ -62,6 +62,12 @@ export default function Toolbar({
   const importInputRef = useRef(null)
   const [selTrack, setSelTrack] = useState(track || 'tech')
   const [selStage, setSelStage] = useState('social')
+  const [renaming, setRenaming] = useState(false)
+
+  const commitRename = value => {
+    setRenaming(false)
+    if (value.trim() && value.trim() !== (activeDoc.name || '')) onRenameDoc(value)
+  }
 
   const pickTrack = tr => {
     setSelTrack(tr)
@@ -94,7 +100,10 @@ export default function Toolbar({
       <div className="popover-wrap" ref={docsPop.ref}>
         <button
           className={`btn btn-select doc-switcher ${docsPop.open ? 'open' : ''}`}
-          onClick={() => docsPop.setOpen(!docsPop.open)}
+          onClick={() => {
+            setRenaming(false)
+            docsPop.setOpen(!docsPop.open)
+          }}
           data-testid="doc-switcher"
         >
           <Icon name="file" size={14} />
@@ -104,17 +113,35 @@ export default function Toolbar({
         {docsPop.open && (
           <div className="popover popover-docs">
             <div className="docs-list">
-              {docs.map(d => (
-                <button
-                  key={d.id}
-                  className={`docs-item ${d.id === activeDoc.id ? 'active' : ''}`}
-                  onClick={docAction(() => onSwitchDoc(d.id))}
-                >
-                  <span className="docs-check">{d.id === activeDoc.id ? '✓' : ''}</span>
-                  <span className="docs-item-name">{d.name || t.docs.untitled}</span>
-                  <span className="docs-item-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
-                </button>
-              ))}
+              {docs.map(d =>
+                renaming && d.id === activeDoc.id ? (
+                  <div key={d.id} className="docs-item active docs-item-renaming">
+                    <span className="docs-check">✓</span>
+                    <input
+                      className="docs-rename-input"
+                      data-testid="rename-input"
+                      autoFocus
+                      defaultValue={activeDoc.name || ''}
+                      onFocus={e => e.target.select()}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') commitRename(e.target.value)
+                        if (e.key === 'Escape') setRenaming(false)
+                      }}
+                      onBlur={e => commitRename(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    key={d.id}
+                    className={`docs-item ${d.id === activeDoc.id ? 'active' : ''}`}
+                    onClick={docAction(() => onSwitchDoc(d.id))}
+                  >
+                    <span className="docs-check">{d.id === activeDoc.id ? '✓' : ''}</span>
+                    <span className="docs-item-name">{d.name || t.docs.untitled}</span>
+                    <span className="docs-item-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
+                  </button>
+                ),
+              )}
             </div>
             <div className="menu-divider" />
             <button className="menu-item" onClick={docAction(onCreateDoc)}>
@@ -125,7 +152,7 @@ export default function Toolbar({
               <span className="menu-item-icon">⧉</span>
               {t.docs.duplicate}
             </button>
-            <button className="menu-item" onClick={docAction(onRenameDoc)}>
+            <button className="menu-item" onClick={() => setRenaming(true)}>
               <span className="menu-item-icon">✎</span>
               {t.docs.rename}
             </button>
@@ -186,16 +213,15 @@ export default function Toolbar({
 
         <div className="popover-wrap" ref={samplePop.ref}>
           <button
-            className={`btn btn-ghost more-btn ${samplePop.open ? 'open' : ''}`}
+            className={`btn btn-ghost ${samplePop.open ? 'open' : ''}`}
             onClick={() => samplePop.setOpen(!samplePop.open)}
-            title={t.more}
             data-testid="more-btn"
           >
-            ⋯
+            {t.sampleLib}
+            <Icon name="chevron" size={13} className="select-chevron" />
           </button>
           {samplePop.open && (
             <div className="popover popover-right popover-sample">
-              <div className="menu-heading">{t.loadSample}</div>
               <div className="sample-row">
                 <span className="typo-label">{t.samplePanel.direction}</span>
                 <div className="track-chips">
@@ -233,23 +259,27 @@ export default function Toolbar({
                 </button>
               </div>
               <div className="menu-divider" />
-              <div className="more-row">
-                <button
-                  className="btn btn-small btn-danger"
-                  onClick={() => {
-                    samplePop.setOpen(false)
-                    onClear()
-                  }}
-                >
-                  {t.clearAll}
-                </button>
-                <button className="btn btn-small" onClick={() => onPatch({ lang: lang === 'zh' ? 'en' : 'zh' })}>
-                  {t.language}
-                </button>
-              </div>
+              <button
+                className="menu-item menu-item-danger"
+                onClick={() => {
+                  samplePop.setOpen(false)
+                  onClear()
+                }}
+              >
+                <span className="menu-item-icon">🗑</span>
+                {t.clearAll}
+              </button>
             </div>
           )}
         </div>
+
+        <button
+          className="btn btn-ghost lang-btn"
+          onClick={() => onPatch({ lang: lang === 'zh' ? 'en' : 'zh' })}
+          title={t.language}
+        >
+          {t.language}
+        </button>
 
         {authUser ? (
           <div className="popover-wrap" ref={accountPop.ref}>

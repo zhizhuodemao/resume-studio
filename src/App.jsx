@@ -109,6 +109,16 @@ export default function App() {
   const [pendingJd, setPendingJd] = useState(null)
   const [authUser, setAuthUser] = useState(null)
   const [loginOpen, setLoginOpen] = useState(false)
+  const [dialog, setDialog] = useState(null) // { message, danger, alertOnly, resolve }
+  const askConfirm = useCallback((message, opts = {}) => {
+    return new Promise(resolve => setDialog({ message, ...opts, resolve }))
+  }, [])
+  const closeDialog = ok => {
+    setDialog(d => {
+      d?.resolve(ok)
+      return null
+    })
+  }
   const measureRef = useRef({ content: 0, page: 1123 })
   const [panelWidth, setPanelWidth] = useState(() => {
     const w = Number(localStorage.getItem('rs-panel-w'))
@@ -185,7 +195,7 @@ export default function App() {
       try {
         const cloud = await api.pullState()
         if (cloud?.state) {
-          if (window.confirm(t.account.confirmLoadCloud)) {
+          if (await askConfirm(t.account.confirmLoadCloud)) {
             savePersistedState(cloud.state)
             // keep the unload flush from overwriting the restored state
             stateRef.current = cloud.state
@@ -198,7 +208,7 @@ export default function App() {
         console.error(err)
       }
     },
-    [t],
+    [t, askConfirm],
   )
 
   const handleLogout = useCallback(() => {
@@ -376,14 +386,16 @@ export default function App() {
     })
   }, [t])
 
-  const renameDoc = useCallback(() => {
-    const name = window.prompt(t.docs.renamePrompt, active?.name || '')
-    if (name === null) return
-    patchDoc({ name: name.trim() })
-  }, [t, active, patchDoc])
+  const renameDoc = useCallback(
+    name => {
+      if (typeof name !== 'string' || !name.trim()) return
+      patchDoc({ name: name.trim() })
+    },
+    [patchDoc],
+  )
 
-  const deleteDoc = useCallback(() => {
-    if (!window.confirm(t.docs.confirmDelete)) return
+  const deleteDoc = useCallback(async () => {
+    if (!(await askConfirm(t.docs.confirmDelete, { danger: true }))) return
     setState(s => {
       const rest = s.resumes.filter(d => d.id !== s.activeId)
       if (rest.length === 0) {
@@ -392,7 +404,7 @@ export default function App() {
       }
       return { ...s, resumes: rest, activeId: rest[0].id }
     })
-  }, [t])
+  }, [t, askConfirm])
 
   const exportDocFile = useCallback(() => {
     if (!active) return
@@ -414,16 +426,16 @@ export default function App() {
         if (!doc.name) doc.name = file.name.replace(/\.(resume\.)?json$/i, '') || t.docs.untitled
         setState(s => ({ ...s, resumes: [...s.resumes, doc], activeId: doc.id }))
       } catch {
-        window.alert(t.docs.importError)
+        askConfirm(t.docs.importError, { alertOnly: true })
       }
     },
-    [t],
+    [t, askConfirm],
   )
 
   /* ---------- Samples / clear / export ---------- */
   const applySample = useCallback(
-    (nextTrack, stage, withConfirm = true) => {
-      if (withConfirm && !window.confirm(t.confirmSample)) return
+    async (nextTrack, stage, withConfirm = true) => {
+      if (withConfirm && !(await askConfirm(t.confirmSample))) return
       const s = stateRef.current
       const doc = s.resumes.find(d => d.id === s.activeId)
       if (!doc) return
@@ -439,11 +451,11 @@ export default function App() {
         ),
       }))
     },
-    [t, pushHistory],
+    [t, pushHistory, askConfirm],
   )
 
-  const handleClear = () => {
-    if (window.confirm(t.confirmClear)) setResume(emptyResume())
+  const handleClear = async () => {
+    if (await askConfirm(t.confirmClear, { danger: true })) setResume(emptyResume())
   }
   const handleExport = () => window.print()
 
@@ -796,6 +808,7 @@ export default function App() {
                   placeholders={placeholders}
                   coverLetter={active.coverLetter}
                   onChangeCover={handleChangeCover}
+                  onConfirm={askConfirm}
                 />
               ) : (
                 <AppearancePanel
@@ -820,6 +833,28 @@ export default function App() {
         </nav>
       </div>
       {active.page.size === 'letter' && <style>{'@media print { @page { size: letter; margin: 0 } }'}</style>}
+      {dialog && (
+        <div className="app-dialog-overlay" role="alertdialog" aria-modal="true" onClick={() => closeDialog(false)}>
+          <div className="app-dialog" onClick={e => e.stopPropagation()} data-testid="app-dialog">
+            <p className="app-dialog-msg">{dialog.message}</p>
+            <div className="app-dialog-actions">
+              {!dialog.alertOnly && (
+                <button className="btn" data-testid="dialog-cancel" onClick={() => closeDialog(false)}>
+                  {t.dialog.cancel}
+                </button>
+              )}
+              <button
+                className={`btn ${dialog.danger ? 'btn-danger-solid' : 'btn-primary'}`}
+                data-testid="dialog-ok"
+                autoFocus
+                onClick={() => closeDialog(true)}
+              >
+                {t.dialog.ok}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {loginOpen && <AccountModal t={t} onClose={() => setLoginOpen(false)} onAuthed={handleAuthed} />}
       {onboarding && (
         <Onboarding

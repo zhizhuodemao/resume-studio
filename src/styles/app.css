@@ -3499,3 +3499,63 @@ input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* In-app dialog (native prompt/confirm/alert are banned) */
+.app-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  animation: pop-in var(--dur-fast) var(--ease);
+}
+
+.app-dialog {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 22px 24px 18px;
+  width: min(400px, calc(100vw - 48px));
+  box-shadow: 0 24px 64px -12px rgba(16, 24, 40, 0.3);
+  animation: card-in var(--dur) var(--ease);
+}
+
+.app-dialog-msg {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0 0 18px;
+  white-space: pre-line;
+}
+
+.app-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-danger-solid {
+  background: #d92d20;
+  color: #fff;
+  border: none;
+}
+
+.btn-danger-solid:hover {
+  background: #b42318;
+}
+
+/* inline rename inside the docs menu */
+.docs-item-renaming {
+  padding: 4px 10px;
+}
+
+.docs-rename-input {
+  flex: 1;
+  border: 1.5px solid var(--ink);
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+}

@@ -47,22 +47,37 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
       ...messages.filter(m => !m.system).map(m => ({ role: m.role, content: m.content })),
       { role: 'user', content: text },
     ]
-    setMessages(ms => [...ms, { role: 'user', content: text }])
+    // streaming placeholder appended right away — deltas type into it
+    setMessages(ms => [...ms, { role: 'user', content: text }, { role: 'assistant', content: '', streaming: true }])
     setBusy(true)
+    const patchStreaming = updater =>
+      setMessages(ms => {
+        const copy = [...ms]
+        const last = copy[copy.length - 1]
+        if (last?.streaming) copy[copy.length - 1] = updater(last)
+        return copy
+      })
+    const finalize = finalMsg =>
+      setMessages(ms => {
+        const copy = [...ms]
+        if (copy[copy.length - 1]?.streaming) copy[copy.length - 1] = finalMsg
+        else copy.push(finalMsg)
+        return copy
+      })
     try {
-      const result = await onRunTurn(history)
-      setMessages(ms => [
-        ...ms,
-        {
-          role: 'assistant',
-          content: result.message || (result.labels.length ? t.cmd.done : t.cmd.noop),
-          labels: result.labels,
-          snapshot: result.snapshot,
-        },
-      ])
+      const result = await onRunTurn(history, {
+        onDelta: d => patchStreaming(m => ({ ...m, content: m.content + d })),
+        onToolCall: () => patchStreaming(m => ({ ...m, working: true })),
+      })
+      finalize({
+        role: 'assistant',
+        content: result.message || (result.labels.length ? t.cmd.done : t.cmd.noop),
+        labels: result.labels,
+        snapshot: result.snapshot,
+      })
     } catch (err) {
       console.error(err)
-      setMessages(ms => [...ms, { role: 'assistant', content: t.ai.error, error: true }])
+      finalize({ role: 'assistant', content: t.ai.error, error: true })
     } finally {
       setBusy(false)
     }
@@ -104,7 +119,14 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
       <div className="coach-list assistant-list" ref={listRef}>
         {messages.map((m, i) => (
           <div key={i} className={`coach-msg coach-msg-${m.role} ${m.error ? 'coach-msg-error' : ''}`}>
-            <div className="coach-bubble">{m.content}</div>
+            <div className={`coach-bubble ${m.streaming ? 'streaming' : ''}`}>
+              {m.content || (m.streaming ? t.coach.thinking : '')}
+            </div>
+            {m.streaming && m.working && (
+              <div className="assistant-working">
+                <span className="cmd-spark">✦</span> {t.cmd.working}
+              </div>
+            )}
             {m.labels?.length > 0 && (
               <div className="cmd-card-labels assistant-labels">
                 {m.labels.map((l, j) => (
@@ -122,13 +144,6 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, ini
             {m.undone && <div className="assistant-undone">{t.assistant.undone}</div>}
           </div>
         ))}
-        {busy && (
-          <div className="coach-msg coach-msg-assistant">
-            <div className="coach-bubble coach-thinking">
-              <span className="cmd-spark">✦</span> {t.coach.thinking}
-            </div>
-          </div>
-        )}
         {messages.length === 1 && !busy && (
           <div className="assistant-suggestions">
             {t.assistant.suggestions.map((sug, i) => (

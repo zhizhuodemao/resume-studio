@@ -435,11 +435,11 @@ export default function App() {
 
   /* ---------- Unified AI assistant ---------- */
   const runAssistantTurn = useCallback(
-    async history => {
+    async (history, callbacks) => {
       const s0 = stateRef.current
       const doc = s0.resumes.find(d => d.id === s0.activeId)
       if (!doc) return { message: '', labels: [], snapshot: null }
-      const { message, actions } = await assistantTurn(history, doc, t, s0.lang)
+      const { message, actions } = await assistantTurn(history, doc, t, s0.lang, callbacks)
       const snapshot = {
         template: doc.template,
         accent: doc.accent,

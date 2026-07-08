@@ -2263,3 +2263,26 @@ details[open] > summary .section-chevron {
       0 28px 56px -16px rgba(16, 24, 40, 0.22);
   }
 }
+
+/* Streaming bubble */
+.coach-bubble.streaming::after {
+  content: '▍';
+  display: inline-block;
+  margin-left: 1px;
+  color: #7c3aed;
+  animation: caret-blink 0.9s steps(2) infinite;
+}
+
+@keyframes caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.assistant-working {
+  font-size: 11.5px;
+  color: var(--text-3);
+  padding: 4px 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}

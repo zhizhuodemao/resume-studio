@@ -1,32 +1,30 @@
-// Vercel serverless AI proxy — the production replacement for the Vite dev
-// proxy. Same route (/api/ai/*), same contract; the API key stays server-side.
+// Vercel Edge AI proxy — streams SSE responses through untouched.
+// Same route/contract as the Vite dev proxy; the key stays server-side.
 //
 // Deploy: set DEEPSEEK_API_KEY in Vercel project env vars.
-// TODO before public launch: add user auth + per-user quota (thin backend
-// phase); this version only enforces basic request hygiene.
+// TODO before public launch: user auth + per-user quota (thin backend).
+
+export const config = { runtime: 'edge' }
 
 const UPSTREAM = 'https://api.deepseek.com'
 const MAX_BODY_BYTES = 200_000
 
-export default async function handler(req, res) {
+export default async function handler(req) {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'method_not_allowed' })
-    return
+    return json({ error: 'method_not_allowed' }, 405)
   }
   const key = process.env.DEEPSEEK_API_KEY
   if (!key) {
-    res.status(500).json({ error: 'ai_not_configured' })
-    return
+    return json({ error: 'ai_not_configured' }, 500)
   }
-  const path = Array.isArray(req.query.path) ? req.query.path.join('/') : String(req.query.path || '')
+  const url = new URL(req.url)
+  const path = url.pathname.replace(/^\/api\/ai\/?/, '')
   if (!/^[\w/-]+$/.test(path)) {
-    res.status(400).json({ error: 'bad_path' })
-    return
+    return json({ error: 'bad_path' }, 400)
   }
-  const body = JSON.stringify(req.body ?? {})
+  const body = await req.text()
   if (body.length > MAX_BODY_BYTES) {
-    res.status(413).json({ error: 'payload_too_large' })
-    return
+    return json({ error: 'payload_too_large' }, 413)
   }
   try {
     const upstream = await fetch(`${UPSTREAM}/${path}`, {
@@ -37,10 +35,23 @@ export default async function handler(req, res) {
       },
       body,
     })
-    const data = await upstream.text()
-    res.status(upstream.status).setHeader('Content-Type', 'application/json').send(data)
+    // Pass the body stream straight through — SSE chunks arrive live.
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        'Content-Type': upstream.headers.get('content-type') || 'application/json',
+        'Cache-Control': 'no-store',
+      },
+    })
   } catch (err) {
     console.error(err)
-    res.status(502).json({ error: 'upstream_failed' })
+    return json({ error: 'upstream_failed' }, 502)
   }
+}
+
+function json(obj, status) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }

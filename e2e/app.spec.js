@@ -382,3 +382,26 @@ test('JD pasted in onboarding triggers an automatic assistant analysis', async (
   await expect(assistant).toContainText('这是我目标职位的 JD')
   await expect(assistant).toContainText('需要我生成定制版吗')
 })
+
+test('assistant streams SSE: typed deltas and fragmented tool calls', async ({ page }) => {
+  const sse = [
+    'data: {"choices":[{"delta":{"content":"正在为你"}}]}',
+    'data: {"choices":[{"delta":{"content":"切换模板…"}}]}',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"set_template","arguments":"{\\"temp"}}]}}]}',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"late\\":\\"bold\\"}"}}]}}]}',
+    'data: [DONE]',
+    '',
+  ].join('\n\n')
+  await page.route('**/api/ai/**', route =>
+    route.fulfill({ contentType: 'text/event-stream', body: sse }),
+  )
+  await page.goto('/?onboarding=0')
+  const input = page.getByTestId('cmd-input')
+  await input.fill('换成创意模板')
+  await input.press('Enter')
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant).toContainText('正在为你切换模板…')
+  // fragmented tool_call reassembled and executed
+  await expect(page.locator('.preview .resume.tpl-bold')).toHaveCount(1)
+  await expect(assistant).toContainText('创意')
+})

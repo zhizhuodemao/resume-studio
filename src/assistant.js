@@ -2,8 +2,8 @@
 // One conversation drives content interviews, edits, layout and tailoring.
 import { COMMAND_TOOLS } from './commander.js'
 import { resumeDigest } from './ai.js'
+import { chatStream } from './sse.js'
 
-const AI_ENDPOINT = '/api/ai/chat/completions'
 const MODEL = 'deepseek-chat'
 
 export const ASSISTANT_TOOLS = [
@@ -42,7 +42,7 @@ function docContext(doc, t) {
   )
 }
 
-export async function assistantTurn(history, doc, t, uiLang = 'zh') {
+export async function assistantTurn(history, doc, t, uiLang = 'zh', callbacks = {}) {
   const langNote = uiLang === 'zh' ? '始终用中文回复。' : 'Always reply in English.'
   const system =
     '你是「简历工坊」的 AI 助手，同时是一位顶尖的简历教练。用户在左侧与你对话，右侧画布实时渲染简历。' +
@@ -55,29 +55,23 @@ export async function assistantTurn(history, doc, t, uiLang = 'zh') {
     '\n\n' +
     docContext(doc, t)
 
-  const res = await fetch(AI_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const { content, toolCalls } = await chatStream(
+    {
       model: MODEL,
-      stream: false,
       messages: [{ role: 'system', content: system }, ...history.slice(-14)],
       tools: ASSISTANT_TOOLS,
       tool_choice: 'auto',
-    }),
-  })
-  if (!res.ok) throw new Error(`AI request failed: ${res.status}`)
-  const data = await res.json()
-  const msg = data.choices?.[0]?.message
-  if (!msg) throw new Error('AI returned empty response')
+    },
+    callbacks,
+  )
   const actions = []
-  for (const call of msg.tool_calls || []) {
-    if (call.type !== 'function') continue
+  for (const call of toolCalls) {
+    if (!call.name) continue
     try {
-      actions.push({ name: call.function.name, args: JSON.parse(call.function.arguments || '{}') })
+      actions.push({ name: call.name, args: JSON.parse(call.arguments || '{}') })
     } catch {
       /* skip malformed tool call */
     }
   }
-  return { message: (msg.content || '').trim(), actions }
+  return { message: content.trim(), actions }
 }

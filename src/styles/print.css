@@ -55,3 +55,9 @@
     background: color-mix(in srgb, var(--accent) 5%, #f4f5f7);
   }
 }
+
+@media print {
+  #print-root .print-page + .print-page {
+    break-before: page;
+  }
+}

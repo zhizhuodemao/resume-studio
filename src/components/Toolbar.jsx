@@ -179,6 +179,8 @@ export default function Toolbar({
   onDeleteDoc,
   onExportDoc,
   onImportDoc,
+  onExportDocx,
+  onExportText,
   canUndo,
   canRedo,
   onUndo,
@@ -265,6 +267,12 @@ export default function Toolbar({
             <div className="docs-actions">
               <button className="btn btn-small" onClick={onExportDoc}>
                 {t.docs.export}
+              </button>
+              <button className="btn btn-small" onClick={onExportDocx}>
+                {t.docs.exportWord}
+              </button>
+              <button className="btn btn-small" onClick={onExportText}>
+                {t.docs.exportText}
               </button>
               <button className="btn btn-small" onClick={() => importInputRef.current?.click()}>
                 {t.docs.import}

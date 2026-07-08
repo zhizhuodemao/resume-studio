@@ -1637,3 +1637,120 @@ details[open] > summary .section-chevron {
 .coach-send {
   padding: 8px 14px;
 }
+
+/* Cover letter page */
+.tpl-cover {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #1f2430;
+}
+
+.cover-root {
+  padding: calc(64px * var(--mx, 1)) calc(64px * var(--mx, 1));
+}
+
+.cover-header {
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--accent, #2563eb);
+  margin-bottom: 28px;
+}
+
+.cover-name {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.cover-title {
+  font-size: 13.5px;
+  color: var(--accent, #2563eb);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.cover-contacts {
+  margin-top: 10px;
+  gap: 6px 16px;
+  font-size: 11.5px;
+  color: #5b6472;
+}
+
+.cover-heading {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 16px;
+}
+
+.cover-body p {
+  font-size: 13px;
+  line-height: 1.9;
+  margin: 0 0 12px;
+}
+
+.cover-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin: 2px 0 10px;
+}
+
+/* Preview -> editor jump feedback */
+.preview .page section {
+  cursor: pointer;
+}
+
+.section-card.flash {
+  animation: card-flash 1.2s ease;
+}
+
+@keyframes card-flash {
+  0%, 60% { box-shadow: 0 0 0 2px var(--ink); }
+  100% { box-shadow: var(--shadow-card); }
+}
+
+/* Mobile tabs */
+.mobile-tabs {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 80;
+}
+
+.mobile-tabs button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.mobile-tabs button.active {
+  color: var(--text);
+  box-shadow: inset 0 2px 0 var(--ink);
+}
+
+@media (max-width: 900px) {
+  .mobile-tabs {
+    display: flex;
+  }
+
+  .app-body {
+    padding-bottom: 46px;
+  }
+
+  .app-body.mobile-edit .preview,
+  .app-body.mobile-edit .insight-drawer,
+  .app-body.mobile-edit .coach-drawer {
+    display: none;
+  }
+
+  .app-body.mobile-preview .editor {
+    display: none;
+  }
+}

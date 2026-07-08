@@ -6,6 +6,7 @@ import CampusTemplate from './CampusTemplate.jsx'
 import TimelineTemplate from './TimelineTemplate.jsx'
 import DuotoneTemplate from './DuotoneTemplate.jsx'
 import BoldTemplate from './BoldTemplate.jsx'
+import CoverLetter from './CoverLetter.jsx'
 
 const TEMPLATES = {
   modern: ModernTemplate,
@@ -23,11 +24,11 @@ export const TEMPLATE_IDS = Object.keys(TEMPLATES)
 export { DEFAULT_TYPOGRAPHY } from '../store.js'
 import { DEFAULT_TYPOGRAPHY } from '../store.js'
 
-export default function Resume({ template, resume, accent, typography = DEFAULT_TYPOGRAPHY, page, t }) {
+export default function Resume({ template, resume, accent, typography = DEFAULT_TYPOGRAPHY, page, t, cover = false, coverContent = '' }) {
   const Template = TEMPLATES[template] || ModernTemplate
   const cls = [
     'resume',
-    `tpl-${template}`,
+    cover ? 'tpl-cover' : `tpl-${template}`,
     `size-${typography.size}`,
     `density-${typography.density}`,
     `margin-${page?.margin || 'normal'}`,
@@ -37,8 +38,8 @@ export default function Resume({ template, resume, accent, typography = DEFAULT_
     .join(' ')
   const fit = page?.fitScale && page.fitScale < 1 ? page.fitScale : 1
   return (
-    <div className={cls} style={{ '--accent': accent, '--fit': fit }}>
-      <Template resume={resume} t={t} />
+    <div className={cls} style={{ '--accent': accent, '--fit': cover ? 1 : fit }}>
+      {cover ? <CoverLetter basics={resume.basics} content={coverContent} t={t} /> : <Template resume={resume} t={t} />}
     </div>
   )
 }

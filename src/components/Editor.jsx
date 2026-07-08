@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { uid } from '../sampleData.js'
-import { polishText, generateBullets, generateSummary } from '../ai.js'
+import { polishText, generateBullets, generateSummary, generateCoverLetter } from '../ai.js'
 
 function AiAssist({ t, getPayload, onApply, generate }) {
   const [phase, setPhase] = useState('idle') // idle | loading | preview | error
@@ -27,6 +27,8 @@ function AiAssist({ t, getPayload, onApply, generate }) {
     try {
       if (generate.kind === 'summary') {
         setResult(await generateSummary(generate.getResume()))
+      } else if (generate.kind === 'cover') {
+        setResult(await generateCoverLetter(generate.getResume()))
       } else {
         if (!genInput.trim()) {
           setPhase('idle')
@@ -82,7 +84,7 @@ function AiAssist({ t, getPayload, onApply, generate }) {
         <button type="button" className="ai-btn" onClick={runGenerate} disabled={phase === 'loading'}>
           {phase === 'loading'
             ? t.ai.generating
-            : `✨ ${generate.kind === 'summary' ? t.ai.genSummary : t.ai.generate}`}
+            : `✨ ${generate.kind === 'summary' ? t.ai.genSummary : generate.kind === 'cover' ? t.ai.genCover : t.ai.generate}`}
         </button>
         {phase === 'error' && <span className="ai-error">{t.ai.error}</span>}
       </div>
@@ -410,7 +412,7 @@ function SectionCard({ t, title, sectionKey, resume, setResume, children, onRena
 
 const CUSTOM_PRESETS = ['certificate', 'language', 'award', 'volunteer', 'custom']
 
-export default function Editor({ t, resume, setResume, placeholders }) {
+export default function Editor({ t, resume, setResume, placeholders, coverLetter, onChangeCover }) {
   const f = t.fields
   const ph = placeholders || {}
   const setBasics = patch => setResume(r => ({ ...r, basics: { ...r.basics, ...patch } }))
@@ -801,6 +803,40 @@ export default function Editor({ t, resume, setResume, placeholders }) {
         }
         return sectionEditors[key]
       })}
+
+      {coverLetter && (
+        <details className={`section-card ${coverLetter.enabled ? '' : 'section-hidden'}`} open>
+          <summary>
+            <Icon name="chevron" size={14} className="section-chevron" />
+            <span className="section-title">{t.cover.title}</span>
+            <span className="section-tools" onClick={e => e.preventDefault()}>
+              <button
+                className="icon-btn"
+                title={coverLetter.enabled ? t.actions.hideSection : t.actions.showSection}
+                onClick={() => onChangeCover({ ...coverLetter, enabled: !coverLetter.enabled })}
+              >
+                <Icon name={coverLetter.enabled ? 'eye' : 'eyeOff'} size={14} />
+              </button>
+            </span>
+          </summary>
+          <div className="section-body">
+            <p className="cover-hint">{t.cover.hint}</p>
+            <AreaField
+              label={t.cover.title}
+              value={coverLetter.content}
+              rows={10}
+              rich={t.rich}
+              onChange={v => onChangeCover({ ...coverLetter, content: v })}
+            />
+            <AiAssist
+              t={t}
+              getPayload={() => ({ text: coverLetter.content, kind: 'summary' })}
+              onApply={v => onChangeCover({ ...coverLetter, content: v, enabled: true })}
+              generate={{ kind: 'cover', getResume: () => resume }}
+            />
+          </div>
+        </details>
+      )}
 
       <div className="add-section">
         <button className="btn btn-add" onClick={() => setAddOpen(o => !o)}>

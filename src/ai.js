@@ -320,3 +320,15 @@ export function applyCoachPatch(resume, patch) {
   }
   return next
 }
+
+export async function generateCoverLetter(resume, uiLang = 'zh') {
+  const digest = resumeDigest(resume)
+  const zh = uiLang === 'zh'
+  const system = zh
+    ? '你是资深求职顾问。根据下面的简历写一封求职信：250-400 字，结构为开场（应聘意向）、核心段（用简历中最有说服力的 2-3 个量化成果证明匹配度）、收尾（表达意愿与联系方式提示）。语气专业、诚恳、不卑不亢；只使用简历中的事实，绝不编造；不知道目标公司时用「贵公司」。直接输出正文（含落款姓名），不加解释。'
+    : "You are a senior career consultant. Based on the resume below, write a 200-320 word cover letter: an opening stating intent, a core paragraph proving fit with the 2-3 most convincing quantified achievements from the resume, and a confident close. Professional and sincere; use only facts from the resume; refer to 'your company' when the employer is unknown. Output only the letter body with a signature line."
+  return (await chat([
+    { role: 'system', content: system },
+    { role: 'user', content: digest },
+  ])).trim()
+}

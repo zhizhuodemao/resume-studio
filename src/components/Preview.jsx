@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { PAGE_DIMENSIONS } from '../store.js'
 
-export default function Preview({ t, page, onFitToggle, children }) {
+export default function Preview({ t, page, onFitToggle, extraPage, children }) {
   const dims = PAGE_DIMENSIONS[page?.size] || PAGE_DIMENSIONS.a4
   const fitActive = Boolean(page?.fitScale && page.fitScale < 1)
 
@@ -27,6 +27,23 @@ export default function Preview({ t, page, onFitToggle, children }) {
 
   const pageCount = Math.max(1, Math.ceil((contentHeight - 8) / dims.height))
 
+  // Click a section in the preview -> scroll the matching editor card into view
+  const jumpToEditor = e => {
+    const heading = e.target.closest('section')?.querySelector('h2')
+    const title = heading?.textContent?.trim()
+    if (!title) return
+    for (const card of document.querySelectorAll('.editor .section-card')) {
+      const el = card.querySelector('.section-title, .section-title-input')
+      const name = (el?.value ?? el?.textContent ?? '').trim()
+      if (name && name === title) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        card.classList.add('flash')
+        setTimeout(() => card.classList.remove('flash'), 1200)
+        break
+      }
+    }
+  }
+
   return (
     <main className="preview" ref={areaRef}>
       <div
@@ -36,6 +53,7 @@ export default function Preview({ t, page, onFitToggle, children }) {
         <div
           className="page"
           ref={pageRef}
+          onClick={jumpToEditor}
           style={{ transform: `scale(${scale})`, width: dims.width, minHeight: dims.height }}
         >
           {children}
@@ -48,6 +66,13 @@ export default function Preview({ t, page, onFitToggle, children }) {
           />
         </div>
       </div>
+      {extraPage && (
+        <div className="preview-canvas" style={{ width: dims.width * scale, height: dims.height * scale, marginTop: 24 }}>
+          <div className="page" style={{ transform: `scale(${scale})`, width: dims.width, minHeight: dims.height }}>
+            {extraPage}
+          </div>
+        </div>
+      )}
       <p className="page-hint">
         <span>
           {t.preview.pages(pageCount)} · {t.pageBreakHint}

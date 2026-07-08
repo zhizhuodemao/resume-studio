@@ -27,6 +27,7 @@ export function makeDoc({ name = '', resume, template = 'modern', accent = DEFAU
     track,
     typography: { ...DEFAULT_TYPOGRAPHY, ...typography },
     page: { ...DEFAULT_PAGE, ...page },
+    coverLetter: { enabled: false, content: '' },
     resume: normalizeResume(resume || emptyResume()),
   }
 }
@@ -103,8 +104,14 @@ function normalizeDoc(d) {
     track: typeof doc.track === 'string' ? doc.track : null,
     typography: { ...DEFAULT_TYPOGRAPHY, ...(doc.typography && typeof doc.typography === 'object' ? doc.typography : {}) },
     page: normalizePage(doc.page),
+    coverLetter: normalizeCover(doc.coverLetter),
     resume: normalizeResume(doc.resume),
   }
+}
+
+function normalizeCover(c) {
+  const cover = c && typeof c === 'object' ? c : {}
+  return { enabled: Boolean(cover.enabled), content: str(cover.content) }
 }
 
 function normalizePage(p) {

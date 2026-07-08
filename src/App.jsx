@@ -17,6 +17,7 @@ import Insight from './components/Insight.jsx'
 import Coach from './components/Coach.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
 import { translateResume, applyCoachPatch } from './ai.js'
+import { downloadDocx, downloadText } from './exporters.js'
 
 let loadedFresh = false
 
@@ -100,6 +101,7 @@ export default function App() {
     const p = new URLSearchParams(window.location.search).get('panel')
     return p === 'insight' || p === 'coach' ? p : null
   })
+  const [mobileView, setMobileView] = useState('edit')
   const { lang, resumes, activeId } = state
   const active = resumes.find(d => d.id === activeId) || resumes[0]
   const t = MESSAGES[lang]
@@ -425,6 +427,10 @@ export default function App() {
     [setResume],
   )
 
+  const handleExportDocx = () => active && downloadDocx(active.resume, t, active.name || 'resume')
+  const handleExportText = () => active && downloadText(active.resume, t, active.name || 'resume')
+  const handleChangeCover = useCallback(cover => patchDoc({ coverLetter: cover }), [patchDoc])
+
   const placeholders = useMemo(() => getPlaceholders(active?.track, lang), [active?.track, lang])
 
   const resumeNode = useMemo(
@@ -441,6 +447,20 @@ export default function App() {
       ) : null,
     [active, t],
   )
+
+  const coverNode =
+    active && active.coverLetter?.enabled && active.coverLetter.content.trim() ? (
+      <Resume
+        template={active.template}
+        resume={active.resume}
+        accent={active.accent}
+        typography={active.typography}
+        page={active.page}
+        t={t}
+        cover
+        coverContent={active.coverLetter.content}
+      />
+    ) : null
 
   if (!active) return null
 
@@ -467,6 +487,8 @@ export default function App() {
           onDeleteDoc={deleteDoc}
           onExportDoc={exportDocFile}
           onImportDoc={importDocFile}
+          onExportDocx={handleExportDocx}
+          onExportText={handleExportText}
           canUndo={canUndo}
           canRedo={canRedo}
           onUndo={undo}
@@ -481,9 +503,16 @@ export default function App() {
           onToggleInsight={() => setRightPanel(p => (p === 'insight' ? null : 'insight'))}
           onToggleCoach={() => setRightPanel(p => (p === 'coach' ? null : 'coach'))}
         />
-        <div className="app-body">
-          <Editor t={t} resume={active.resume} setResume={setResume} placeholders={placeholders} />
-          <Preview t={t} page={active.page} onFitToggle={handleFitToggle}>
+        <div className={`app-body mobile-${mobileView}`}>
+          <Editor
+            t={t}
+            resume={active.resume}
+            setResume={setResume}
+            placeholders={placeholders}
+            coverLetter={active.coverLetter}
+            onChangeCover={handleChangeCover}
+          />
+          <Preview t={t} page={active.page} onFitToggle={handleFitToggle} extraPage={coverNode}>
             {resumeNode}
           </Preview>
           {rightPanel === 'insight' && (
@@ -507,6 +536,14 @@ export default function App() {
             />
           )}
         </div>
+        <nav className="mobile-tabs">
+          <button className={mobileView === 'edit' ? 'active' : ''} onClick={() => setMobileView('edit')}>
+            {t.mobile.edit}
+          </button>
+          <button className={mobileView === 'preview' ? 'active' : ''} onClick={() => setMobileView('preview')}>
+            {t.mobile.preview}
+          </button>
+        </nav>
       </div>
       {active.page.size === 'letter' && <style>{'@media print { @page { size: letter; margin: 0 } }'}</style>}
       {onboarding && (
@@ -523,7 +560,8 @@ export default function App() {
       )}
       {/* Untransformed copy used only by @media print */}
       <div id="print-root" aria-hidden="true">
-        {resumeNode}
+        <div className="print-page">{resumeNode}</div>
+        {coverNode && <div className="print-page">{coverNode}</div>}
       </div>
     </>
   )

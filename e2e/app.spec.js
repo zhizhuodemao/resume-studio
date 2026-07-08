@@ -256,3 +256,43 @@ test('JD tailoring creates and opens a tailored copy', async ({ page }) => {
   await page.locator('.docs-item', { hasText: /^我的简历/ }).first().click()
   await expect(summary).not.toHaveValue('为该职位定制的简介')
 })
+
+test('Word and TXT export download files', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('doc-switcher').click()
+  const d1 = page.waitForEvent('download')
+  await page.getByRole('button', { name: '导出 Word' }).click()
+  expect((await d1).suggestedFilename()).toContain('.docx')
+  const d2 = page.waitForEvent('download')
+  await page.getByRole('button', { name: '导出 TXT' }).click()
+  expect((await d2).suggestedFilename()).toContain('.txt')
+})
+
+test('cover letter renders as an extra preview page when enabled', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  const coverCard = page.locator('.section-card', { hasText: '求职信' })
+  await coverCard.locator('textarea').fill('尊敬的招聘经理：\n我对贵公司的职位很感兴趣。')
+  await expect(page.locator('.preview .page')).toHaveCount(1) // still disabled
+  await coverCard.getByTitle('在简历中显示').click()
+  await expect(page.locator('.preview .page')).toHaveCount(2)
+  await expect(page.locator('.preview .page').nth(1)).toContainText('尊敬的招聘经理')
+  await coverCard.getByTitle('在简历中隐藏').click()
+  await expect(page.locator('.preview .page')).toHaveCount(1)
+})
+
+test('clicking a preview section jumps to its editor card', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  await page.locator('.preview .page section', { hasText: '教育经历' }).locator('h2').click()
+  await expect(page.locator('.section-card.flash', { hasText: '教育经历' })).toHaveCount(1)
+})
+
+test('mobile layout: tab bar switches between edit and preview', async ({ page }) => {
+  await page.setViewportSize({ width: 420, height: 800 })
+  await page.goto('/?onboarding=0')
+  await expect(page.locator('.mobile-tabs')).toBeVisible()
+  await expect(page.locator('.editor')).toBeVisible()
+  await expect(page.locator('.preview')).toBeHidden()
+  await page.locator('.mobile-tabs').getByRole('button', { name: '预览' }).click()
+  await expect(page.locator('.editor')).toBeHidden()
+  await expect(page.locator('.preview')).toBeVisible()
+})

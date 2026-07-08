@@ -360,3 +360,25 @@ test('assistant executes tool calls and supports per-turn undo', async ({ page }
   await expect(page.locator('.preview .resume.tpl-modern')).toHaveCount(1)
   await expect(page.locator('.preview .page')).not.toContainText('助手更新的简介')
 })
+
+test('JD pasted in onboarding triggers an automatic assistant analysis', async ({ page }) => {
+  await page.route('**/api/ai/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: {
+          content: '匹配度不错：你的 React 经验是加分项；差距是缺少 K8s。需要我生成定制版吗？',
+          tool_calls: [],
+        } }],
+      }),
+    }),
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: '产品', exact: true }).click()
+  await page.locator('.onboard-jd').fill('招聘高级产品经理，要求 B 端 SaaS 经验')
+  await page.getByRole('button', { name: '开始制作' }).click()
+  const assistant = page.getByTestId('assistant')
+  // the pasted JD becomes the first user message automatically
+  await expect(assistant).toContainText('这是我目标职位的 JD')
+  await expect(assistant).toContainText('需要我生成定制版吗')
+})

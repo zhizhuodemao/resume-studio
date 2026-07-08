@@ -42,6 +42,8 @@ export const MESSAGES = {
       subtitle: '选择求职方向，我们会准备好对应的示例内容与合适的模板，直接在上面修改就行。',
       start: '开始制作',
       skip: '跳过，直接开始',
+      jdLabel: '目标职位 JD（可选）',
+      jdPlaceholder: '粘贴目标职位描述，进入后 AI 助手会自动分析匹配度并给出优化建议…',
     },
     docs: {
       untitled: '未命名简历',
@@ -130,6 +132,7 @@ export const MESSAGES = {
       placeholder: '吩咐 AI，或粘贴 JD、聊聊你的经历…',
       findings: n => `${n} 条优化建议`,
       undone: '已撤销',
+      jdIntro: jd => `这是我目标职位的 JD，请帮我分析匹配度并给出优化建议：\n\n${jd}`,
       suggestions: ['把工作经历改得更量化', '压缩到一页', '换个更适合投外企的模板', '帮我把简介写得更有冲击力'],
     },
     refine: { open: '精修', title: '精修编辑' },
@@ -288,6 +291,8 @@ export const MESSAGES = {
       subtitle: "Pick your track — we'll load tailored sample content and a matching template you can edit right away.",
       start: 'Start building',
       skip: 'Skip for now',
+      jdLabel: 'Target job description (optional)',
+      jdPlaceholder: 'Paste the JD — the AI assistant will analyze the match and suggest edits right away…',
     },
     docs: {
       untitled: 'Untitled resume',
@@ -376,6 +381,7 @@ export const MESSAGES = {
       placeholder: 'Ask AI, paste a JD, or talk about your experience…',
       findings: n => `${n} suggestion${n > 1 ? 's' : ''}`,
       undone: 'Undone',
+      jdIntro: jd => `Here is the JD for my target role — please analyze the match and suggest edits:\n\n${jd}`,
       suggestions: ['Make my experience more quantified', 'Fit to one page', 'Switch to a template for global companies', 'Punch up my summary'],
     },
     refine: { open: 'Refine', title: 'Refine editor' },

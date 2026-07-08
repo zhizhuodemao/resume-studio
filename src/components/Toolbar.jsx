@@ -420,7 +420,7 @@ export default function Toolbar({
             onClick={() => aiPop.setOpen(!aiPop.open)}
             data-testid="ai-menu-btn"
           >
-            ✨ AI
+            <span className="cmd-spark">✦</span> AI
           </button>
           {aiPop.open && (
             <div className="popover popover-right popover-menu">

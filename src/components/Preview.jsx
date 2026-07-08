@@ -9,6 +9,21 @@ export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, on
   const pageRef = useRef(null)
   const [scale, setScale] = useState(0.8)
   const [contentHeight, setContentHeight] = useState(dims.height)
+  const [aiFlash, setAiFlash] = useState(false)
+
+  useEffect(() => {
+    let timer
+    const onAi = () => {
+      setAiFlash(true)
+      clearTimeout(timer)
+      timer = setTimeout(() => setAiFlash(false), 1400)
+    }
+    window.addEventListener('ai-updated', onAi)
+    return () => {
+      window.removeEventListener('ai-updated', onAi)
+      clearTimeout(timer)
+    }
+  }, [])
 
   useEffect(() => {
     const area = areaRef.current
@@ -42,7 +57,7 @@ export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, on
         style={{ width: dims.width * scale, height: contentHeight * scale }}
       >
         <div
-          className="page"
+          className={`page ${aiFlash ? 'ai-flash' : ''}`}
           ref={pageRef}
           onClick={jumpToEditor}
           style={{ transform: `scale(${scale})`, width: dims.width, minHeight: dims.height }}

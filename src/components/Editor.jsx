@@ -84,7 +84,7 @@ function AiAssist({ t, getPayload, onApply, generate }) {
         <button type="button" className="ai-btn" onClick={runGenerate} disabled={phase === 'loading'}>
           {phase === 'loading'
             ? t.ai.generating
-            : `✨ ${generate.kind === 'summary' ? t.ai.genSummary : generate.kind === 'cover' ? t.ai.genCover : t.ai.generate}`}
+            : <><span className="cmd-spark">✦</span> {generate.kind === 'summary' ? t.ai.genSummary : generate.kind === 'cover' ? t.ai.genCover : t.ai.generate}</>}
         </button>
         {phase === 'error' && <span className="ai-error">{t.ai.error}</span>}
       </div>
@@ -94,7 +94,7 @@ function AiAssist({ t, getPayload, onApply, generate }) {
   return (
     <div className="ai-assist">
       <button type="button" className="ai-btn" onClick={run} disabled={phase === 'loading'}>
-        {phase === 'loading' ? t.ai.polishing : `✨ ${t.ai.polish}`}
+        {phase === 'loading' ? t.ai.polishing : <><span className="cmd-spark">✦</span> {t.ai.polish}</>}
       </button>
       {phase === 'error' && <span className="ai-error">{t.ai.error}</span>}
     </div>

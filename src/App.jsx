@@ -106,6 +106,7 @@ export default function App() {
   })
   const [mobileView, setMobileView] = useState('edit')
   const [refineOpen, setRefineOpen] = useState(false)
+  const [pendingJd, setPendingJd] = useState(null)
   const measureRef = useRef({ content: 0, page: 1123 })
   const { lang, resumes, activeId } = state
   const active = resumes.find(d => d.id === activeId) || resumes[0]
@@ -481,6 +482,7 @@ export default function App() {
           page: cur.page,
           resume: cur.resume,
         })
+        window.dispatchEvent(new CustomEvent('ai-updated'))
         if (wantsFit) {
           setTimeout(() => {
             const m = measureRef.current
@@ -603,7 +605,15 @@ export default function App() {
           onToggleRefine={() => setRefineOpen(o => !o)}
         />
         <div className={`app-body mobile-${mobileView}`}>
-          <Assistant t={t} lang={lang} doc={active} onRunTurn={runAssistantTurn} onUndoSnapshot={handleUndoSnapshot} />
+          <Assistant
+            t={t}
+            lang={lang}
+            doc={active}
+            onRunTurn={runAssistantTurn}
+            onUndoSnapshot={handleUndoSnapshot}
+            initialMessage={pendingJd ? t.assistant.jdIntro(pendingJd) : null}
+            onInitialSent={() => setPendingJd(null)}
+          />
           <Preview
             t={t}
             page={active.page}
@@ -666,8 +676,9 @@ export default function App() {
           t={t}
           lang={lang}
           onPatch={patch}
-          onStart={(tr, stage) => {
+          onStart={(tr, stage, jd) => {
             applySample(tr, stage, false)
+            if (jd) setPendingJd(jd)
             setOnboarding(false)
           }}
           onSkip={() => setOnboarding(false)}

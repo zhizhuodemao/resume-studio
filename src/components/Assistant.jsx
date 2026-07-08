@@ -3,7 +3,7 @@ import { checkResume } from '../checker.js'
 
 // The left-hand conversation panel: one assistant that coaches, edits,
 // analyzes and tailors. Changes appear as chips with per-turn undo.
-export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot }) {
+export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot, initialMessage, onInitialSent }) {
   const [messages, setMessages] = useState(() => [{ role: 'assistant', content: t.assistant.welcome }])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -17,6 +17,16 @@ export default function Assistant({ t, lang, doc, onRunTurn, onUndoSnapshot }) {
     const el = listRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [messages, busy])
+
+  const initialSentRef = useRef(false)
+  useEffect(() => {
+    if (initialMessage && !initialSentRef.current) {
+      initialSentRef.current = true
+      onInitialSent?.()
+      send(initialMessage)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage])
 
   useEffect(() => {
     const onKey = e => {

@@ -4,6 +4,7 @@ import { SAMPLE_TRACKS, hasStage } from '../samples/index.js'
 export default function Onboarding({ t, lang, onPatch, onStart, onSkip }) {
   const [track, setTrack] = useState('tech')
   const [stage, setStage] = useState('social')
+  const [jd, setJd] = useState('')
 
   const pickTrack = tr => {
     setTrack(tr)
@@ -42,8 +43,17 @@ export default function Onboarding({ t, lang, onPatch, onStart, onSkip }) {
           ))}
         </div>
 
+        <div className="onboard-label">{t.onboarding.jdLabel}</div>
+        <textarea
+          className="onboard-jd"
+          rows={3}
+          value={jd}
+          placeholder={t.onboarding.jdPlaceholder}
+          onChange={e => setJd(e.target.value)}
+        />
+
         <div className="onboard-actions">
-          <button className="btn btn-primary" onClick={() => onStart(track, stage)}>
+          <button className="btn btn-primary" onClick={() => onStart(track, stage, jd.trim())}>
             {t.onboarding.start}
           </button>
           <button className="btn btn-ghost" onClick={onSkip}>

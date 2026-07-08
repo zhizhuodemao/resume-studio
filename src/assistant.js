@@ -52,6 +52,7 @@ export async function assistantTurn(history, doc, t, uiLang = 'zh', callbacks = 
     '3) 用户粘贴职位描述（JD）时：先在回复里给出简短匹配分析（2-3 条优势、2-3 条差距、最重要的 1-2 条修改建议），然后询问是否生成该职位的定制版；只有用户明确同意后才调用 create_tailored_version。\n' +
     '4) 回复口语化、简短（1-3 句 + 必要的列表）。不要重复简历内容原文。\n' +
     '5) 铁律：对简历的任何修改只能通过工具调用完成。绝不在文字回复里粘贴改写后的内容，绝不在没有调用工具的情况下声称"已更新/已修改"。用户要求修改时，直接调用工具，不要先征求确认（除了生成定制版）。\n' +
+    '6) update_resume_content 可修改：简介(summary)、基本信息(basics)、工作经历(experience)、项目(projects)、教育经历(education)——均按简历摘要中的序号 工作[i]/项目[i]/教育[i] 定位；新增条目用 experience_add/education_add/projects_add/skills_add。\n' +
     langNote +
     '\n\n' +
     docContext(doc, t)

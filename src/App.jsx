@@ -443,19 +443,35 @@ export default function App() {
       // Agent guardrail: the model sometimes narrates an edit without
       // calling any tool. Catch the claim and force one action retry.
       const CLAIM = /已(更新|修改|切换|调整|写入|替换|完成)|updated|changed|switched/i
-      if (!turn.actions.length && CLAIM.test(turn.message)) {
+      const retryWith = async nudge => {
         callbacks?.onDelta?.('\n\n')
-        turn = await assistantTurn(
-          [
-            ...history,
-            { role: 'assistant', content: turn.message },
-            { role: 'user', content: t.assistant.actNudge },
-          ],
+        return assistantTurn(
+          [...history, { role: 'assistant', content: turn.message }, { role: 'user', content: nudge }],
           doc,
           t,
           s0.lang,
           callbacks,
         )
+      }
+      if (!turn.actions.length && CLAIM.test(turn.message)) {
+        turn = await retryWith(t.assistant.actNudge)
+      } else if (turn.actions.length) {
+        // dry-run the content actions: if every tool call is a no-op
+        // (unsupported field / bad index), force one corrected retry
+        let effective = false
+        let probe = { ...doc }
+        for (const a of turn.actions) {
+          if (a.name === 'translate_resume' || a.name === 'create_tailored_version') {
+            effective = true
+            break
+          }
+          const res = applyCommandAction(probe, a, t)
+          if (res) {
+            effective = true
+            break
+          }
+        }
+        if (!effective) turn = await retryWith(t.assistant.noopNudge)
       }
       const { message, actions } = turn
       const snapshot = {

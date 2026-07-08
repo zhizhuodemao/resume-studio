@@ -171,11 +171,11 @@ export function resumeDigest(resume) {
   const parts = []
   if (b.name || b.title) parts.push(`${b.name} — ${b.title}`)
   if (b.summary) parts.push(`简介: ${b.summary}`)
-  for (const e of resume.experience) {
-    parts.push(`工作: ${e.role} @ ${e.company} (${e.start}-${e.end || '至今'})\n${e.highlights}`)
-  }
-  for (const p of resume.projects) parts.push(`项目: ${p.name} ${p.role}\n${p.description}`)
-  for (const e of resume.education) parts.push(`教育: ${e.school} ${e.degree} ${e.major} ${e.description}`)
+  resume.experience.forEach((e, i) => {
+    parts.push(`工作[${i}]: ${e.role} @ ${e.company} (${e.start}-${e.end || '至今'})\n${e.highlights}`)
+  })
+  resume.projects.forEach((p, i) => parts.push(`项目[${i}]: ${p.name} ${p.role}\n${p.description}`))
+  resume.education.forEach((e, i) => parts.push(`教育[${i}]: ${e.school} ${e.degree} ${e.major} ${e.description}`))
   if (resume.skills.length) parts.push(`技能: ${resume.skills.map(s => `${s.name}(${s.detail})`).join('; ')}`)
   for (const c of resume.customSections || []) {
     parts.push(`${c.title}: ${c.items.map(i => `${i.title} ${i.subtitle} ${i.description}`).join('; ')}`)

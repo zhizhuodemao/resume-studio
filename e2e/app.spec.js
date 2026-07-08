@@ -202,7 +202,7 @@ test('assistant coaches: interview turn writes into the resume', async ({ page }
   await page.getByTestId('cmd-input').fill('我把转化率提升了 30%')
   await page.getByTestId('cmd-input').press('Enter')
   await expect(assistant).toContainText('下一个问题')
-  await expect(assistant).toContainText('内容已更新')
+  await expect(assistant).toContainText('简介已更新')
   await expect(page.locator('.preview .page')).toContainText('教练更新后的专业简介')
   // per-turn undo reverts the change
   await assistant.getByRole('button', { name: '撤销此次修改' }).click()
@@ -506,5 +506,35 @@ test('agent guardrail: narrated edit without tools triggers a forced action retr
   // the retry actually executed the tool
   await expect(page.locator('.preview .page')).toContainText('守护机制写入的简介')
   expect(call).toBe(2)
-  await expect(page.getByTestId('assistant')).toContainText('内容已更新')
+  await expect(page.getByTestId('assistant')).toContainText('简介已更新')
+})
+
+test('education edits flow through the tool and label honestly', async ({ page }) => {
+  let call = 0
+  await page.route('**/api/ai/**', route => {
+    call += 1
+    const msg =
+      call === 1
+        ? {
+            // first attempt: bad index → no-op → guardrail must force a retry
+            content: '已更新教育经历。',
+            tool_calls: [
+              { id: '1', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ education: [{ index: 9, school: '清华大学' }] }) } },
+            ],
+          }
+        : {
+            content: '已修正为正确的条目。',
+            tool_calls: [
+              { id: '2', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ education: [{ index: 0, school: '清华大学' }] }) } },
+            ],
+          }
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: msg }] }) })
+  })
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('cmd-input').fill('教育经历改成清华大学')
+  await page.getByTestId('cmd-input').press('Enter')
+  await expect(page.locator('.preview .page')).toContainText('清华大学')
+  await expect(page.locator('.preview .page')).not.toContainText('浙江大学')
+  expect(call).toBe(2)
+  await expect(page.getByTestId('assistant')).toContainText('教育经历已更新')
 })

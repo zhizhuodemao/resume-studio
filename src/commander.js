@@ -25,21 +25,76 @@ export const COMMAND_TOOLS = [
           },
           experience: {
             type: 'array',
+            description: '按序号修改已有工作经历（序号见简历摘要中的 工作[i]）',
             items: {
               type: 'object',
               properties: {
                 index: { type: 'integer', description: '经历序号，从 0 开始' },
                 highlights: { type: 'string' }, role: { type: 'string' }, company: { type: 'string' },
+                start: { type: 'string' }, end: { type: 'string' }, location: { type: 'string' },
               },
               required: ['index'],
             },
           },
           projects: {
             type: 'array',
+            description: '按序号修改已有项目（序号见 项目[i]）',
             items: {
               type: 'object',
-              properties: { index: { type: 'integer' }, description: { type: 'string' }, name: { type: 'string' } },
+              properties: {
+                index: { type: 'integer' }, description: { type: 'string' }, name: { type: 'string' },
+                role: { type: 'string' }, link: { type: 'string' },
+              },
               required: ['index'],
+            },
+          },
+          education: {
+            type: 'array',
+            description: '按序号修改已有教育经历（序号见 教育[i]）',
+            items: {
+              type: 'object',
+              properties: {
+                index: { type: 'integer' }, school: { type: 'string' }, degree: { type: 'string' },
+                major: { type: 'string' }, description: { type: 'string' },
+                start: { type: 'string' }, end: { type: 'string' },
+              },
+              required: ['index'],
+            },
+          },
+          experience_add: {
+            type: 'array',
+            description: '新增工作经历条目',
+            items: {
+              type: 'object',
+              properties: {
+                company: { type: 'string' }, role: { type: 'string' }, start: { type: 'string' },
+                end: { type: 'string' }, location: { type: 'string' }, highlights: { type: 'string' },
+              },
+              required: ['company', 'role'],
+            },
+          },
+          education_add: {
+            type: 'array',
+            description: '新增教育经历条目',
+            items: {
+              type: 'object',
+              properties: {
+                school: { type: 'string' }, degree: { type: 'string' }, major: { type: 'string' },
+                start: { type: 'string' }, end: { type: 'string' }, description: { type: 'string' },
+              },
+              required: ['school'],
+            },
+          },
+          projects_add: {
+            type: 'array',
+            description: '新增项目条目',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' }, role: { type: 'string' }, link: { type: 'string' },
+                description: { type: 'string' },
+              },
+              required: ['name'],
             },
           },
           skills_add: {
@@ -221,43 +276,88 @@ const str = v => (typeof v === 'string' ? v : undefined)
 
 export function applyContentPatch(resume, patch) {
   let next = resume
-  if (str(patch.summary)?.trim()) next = { ...next, basics: { ...next.basics, summary: patch.summary } }
+  const touched = new Set()
+  const uid = (() => {
+    let n = 0
+    return () => `cmd-${Date.now().toString(36)}-${n++}`
+  })()
+
+  if (str(patch.summary)?.trim() && patch.summary !== resume.basics.summary) {
+    next = { ...next, basics: { ...next.basics, summary: patch.summary } }
+    touched.add('summary')
+  }
   if (patch.basics && typeof patch.basics === 'object') {
     const allowed = ['name', 'title', 'location', 'email', 'phone', 'website', 'github']
     const updates = {}
-    for (const k of allowed) if (str(patch.basics[k]) !== undefined) updates[k] = patch.basics[k]
-    if (Object.keys(updates).length) next = { ...next, basics: { ...next.basics, ...updates } }
+    for (const k of allowed) {
+      if (str(patch.basics[k]) !== undefined && patch.basics[k] !== next.basics[k]) updates[k] = patch.basics[k]
+    }
+    if (Object.keys(updates).length) {
+      next = { ...next, basics: { ...next.basics, ...updates } }
+      touched.add('basics')
+    }
   }
+
   const patchList = (listKey, fields) => {
     if (!Array.isArray(patch[listKey])) return
     const list = [...next[listKey]]
-    let touched = false
+    let hit = false
     for (const p of patch[listKey]) {
       const i = Number(p?.index)
       if (!Number.isInteger(i) || !list[i]) continue
       const updates = {}
-      for (const f of fields) if (str(p[f])?.trim()) updates[f] = p[f]
+      for (const f of fields) {
+        if (str(p[f])?.trim() && p[f] !== list[i][f]) updates[f] = p[f]
+      }
       if (Object.keys(updates).length) {
         list[i] = { ...list[i], ...updates }
-        touched = true
+        hit = true
       }
     }
-    if (touched) next = { ...next, [listKey]: list }
+    if (hit) {
+      next = { ...next, [listKey]: list }
+      touched.add(listKey)
+    }
   }
-  patchList('experience', ['highlights', 'role', 'company'])
-  patchList('projects', ['description', 'name'])
+  patchList('experience', ['highlights', 'role', 'company', 'start', 'end', 'location'])
+  patchList('projects', ['description', 'name', 'role', 'link'])
+  patchList('education', ['school', 'degree', 'major', 'description', 'start', 'end'])
+
+  const addList = (addKey, listKey, requiredField, defaults) => {
+    if (!Array.isArray(patch[addKey])) return
+    const additions = patch[addKey]
+      .filter(item => item && str(item[requiredField])?.trim())
+      .map(item => {
+        const entry = { id: uid(), ...defaults }
+        for (const k of Object.keys(defaults)) {
+          if (k !== 'id' && str(item[k]) !== undefined) entry[k] = item[k]
+        }
+        return entry
+      })
+    if (additions.length) {
+      next = { ...next, [listKey]: [...next[listKey], ...additions] }
+      touched.add(listKey)
+    }
+  }
+  addList('experience_add', 'experience', 'company', {
+    company: '', role: '', start: '', end: '', location: '', highlights: '',
+  })
+  addList('education_add', 'education', 'school', {
+    school: '', degree: '', major: '', start: '', end: '', description: '',
+  })
+  addList('projects_add', 'projects', 'name', { name: '', role: '', link: '', description: '' })
+
   if (Array.isArray(patch.skills_add)) {
     const additions = patch.skills_add
-      .filter(s => s && str(s.name)?.trim())
-      .map((s, i) => ({
-        id: `cmd-${Date.now().toString(36)}-${i}`,
-        name: s.name,
-        level: 3,
-        detail: str(s.detail) || '',
-      }))
-    if (additions.length) next = { ...next, skills: [...next.skills, ...additions] }
+      .filter(sk => sk && str(sk.name)?.trim())
+      .map(sk => ({ id: uid(), name: sk.name, level: 3, detail: str(sk.detail) || '' }))
+    if (additions.length) {
+      next = { ...next, skills: [...next.skills, ...additions] }
+      touched.add('skills')
+    }
   }
-  return next
+
+  return { resume: next, touched: [...touched] }
 }
 
 // Applies one sync action to a doc; returns { doc, label } or null when invalid.
@@ -265,9 +365,12 @@ export function applyContentPatch(resume, patch) {
 export function applyCommandAction(doc, action, t) {
   const { name, args } = action
   if (name === 'update_resume_content') {
-    const resume = applyContentPatch(doc.resume, args)
-    if (resume === doc.resume) return null
-    return { doc: { ...doc, resume }, label: t.cmd.labels.content }
+    const { resume, touched } = applyContentPatch(doc.resume, args)
+    if (!touched.length) return null
+    return {
+      doc: { ...doc, resume },
+      label: touched.map(k => t.cmd.labels.sections[k] || t.cmd.labels.content).join('、'),
+    }
   }
   if (name === 'set_template') {
     if (!args.template) return null

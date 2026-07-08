@@ -166,6 +166,8 @@ export const MESSAGES = {
       nudge: '喜欢这次修改吗？注册后简历自动云端备份、AI 额度更充足，换设备也不丢。',
       nudgeCta: '免费注册 / 登录',
       actNudge: '你并没有调用工具，简历没有发生任何变化。请立即用工具执行你刚才描述的修改，不要再解释。',
+      noopNudge:
+        '你调用了工具，但参数没有产生任何实际修改（字段不受支持、序号不存在、或内容与原文相同）。请对照简历摘要中的序号（工作[i]/项目[i]/教育[i]）修正参数并重新调用工具。',
       suggestions: ['把工作经历改得更量化', '压缩到一页', '换个更适合投外企的模板', '帮我把简介写得更有冲击力'],
     },
     refine: { open: '精修', title: '精修编辑', tabContent: '内容', tabLooks: '外观', close: '关闭' },
@@ -184,6 +186,14 @@ export const MESSAGES = {
       dismiss: '知道了',
       labels: {
         content: '内容已更新',
+        sections: {
+          summary: '简介已更新',
+          basics: '基本信息已更新',
+          experience: '工作经历已更新',
+          projects: '项目经历已更新',
+          education: '教育经历已更新',
+          skills: '技能已更新',
+        },
         template: '模板',
         accent: '主题色',
         typography: '排版已调整',
@@ -454,6 +464,8 @@ export const MESSAGES = {
       nudge: 'Like this edit? Sign up for cloud backup and a bigger AI quota — nothing lost across devices.',
       nudgeCta: 'Sign up free / Sign in',
       actNudge: "You did not call any tool — nothing changed. Execute the edit you described via tools now, without further explanation.",
+      noopNudge:
+        'Your tool call produced no actual change (unsupported field, bad index, or identical content). Check the [i] indexes in the resume digest and call the tool again with corrected arguments.',
       suggestions: ['Make my experience more quantified', 'Fit to one page', 'Switch to a template for global companies', 'Punch up my summary'],
     },
     refine: { open: 'Refine', title: 'Refine editor', tabContent: 'Content', tabLooks: 'Looks', close: 'Close' },
@@ -472,6 +484,14 @@ export const MESSAGES = {
       dismiss: 'Got it',
       labels: {
         content: 'Content updated',
+        sections: {
+          summary: 'Summary updated',
+          basics: 'Basics updated',
+          experience: 'Experience updated',
+          projects: 'Projects updated',
+          education: 'Education updated',
+          skills: 'Skills updated',
+        },
         template: 'Template',
         accent: 'Accent',
         typography: 'Typography adjusted',

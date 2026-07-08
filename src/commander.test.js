@@ -54,8 +54,8 @@ describe('applyCommandAction', () => {
 })
 
 describe('applyContentPatch (command superset)', () => {
-  it('patches basics, projects and experience by index', () => {
-    const out = applyContentPatch(doc.resume, {
+  it('patches basics, projects and experience by index, reporting touched sections', () => {
+    const { resume: out, touched } = applyContentPatch(doc.resume, {
       basics: { title: '高级产品经理' },
       experience: [{ index: 0, highlights: '新要点' }],
       projects: [{ index: 0, description: '新描述' }],
@@ -64,9 +64,37 @@ describe('applyContentPatch (command superset)', () => {
     expect(out.experience[0].highlights).toBe('新要点')
     expect(out.projects[0].description).toBe('新描述')
     expect(doc.resume.experience[0].highlights).toBe('旧要点')
+    expect(touched.sort()).toEqual(['basics', 'experience', 'projects'])
   })
 
-  it('ignores invalid indexes and blank values', () => {
-    expect(applyContentPatch(doc.resume, { experience: [{ index: 9, highlights: 'x' }], summary: ' ' })).toBe(doc.resume)
+  it('edits and adds education entries', () => {
+    const base = { ...doc.resume, education: [{ id: 'ed1', school: '上海交通大学', degree: '学士', major: '', start: '', end: '', description: '' }] }
+    const { resume: out, touched } = applyContentPatch(base, {
+      education: [{ index: 0, school: '清华大学' }],
+      education_add: [{ school: '斯坦福大学', degree: '硕士' }],
+    })
+    expect(out.education[0].school).toBe('清华大学')
+    expect(out.education[0].degree).toBe('学士')
+    expect(out.education[1].school).toBe('斯坦福大学')
+    expect(out.education[1].id).toBeTruthy()
+    expect(touched).toEqual(['education'])
+  })
+
+  it('is a no-op for invalid indexes, blanks and identical values', () => {
+    const r1 = applyContentPatch(doc.resume, { experience: [{ index: 9, highlights: 'x' }], summary: ' ' })
+    expect(r1.resume).toBe(doc.resume)
+    expect(r1.touched).toEqual([])
+    const r2 = applyContentPatch(doc.resume, { summary: doc.resume.basics.summary })
+    expect(r2.touched).toEqual([])
+  })
+
+  it('emits per-section labels through applyCommandAction', () => {
+    const res = applyCommandAction(
+      doc,
+      { name: 'update_resume_content', args: { summary: '新简介', experience: [{ index: 0, role: '总监' }] } },
+      t,
+    )
+    expect(res.label).toContain('简介已更新')
+    expect(res.label).toContain('工作经历已更新')
   })
 })

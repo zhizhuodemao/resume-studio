@@ -199,3 +199,60 @@ test('JD match analyzes against a mocked AI response', async ({ page }) => {
   await expect(drawer).toContainText('React 技术栈深度匹配')
   await expect(drawer).toContainText('补充容器化相关经验')
 })
+
+test('coach agent: interview turn applies a patch to the resume', async ({ page }) => {
+  await page.route('**/api/ai/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          reply: '很棒！我把这段成果写进了你的简历。下一个问题：这个项目服务了多少用户？',
+          patch: { summary: '教练更新后的专业简介，突出量化成果。' },
+        }) } }],
+      }),
+    }),
+  )
+  await page.goto('/?onboarding=0&panel=coach')
+  const drawer = page.getByTestId('coach-drawer')
+  await expect(drawer).toContainText('简历教练')
+  await drawer.locator('.coach-input').fill('我把转化率提升了 30%')
+  await drawer.getByRole('button', { name: '发送' }).click()
+  await expect(drawer).toContainText('下一个问题')
+  await expect(drawer).toContainText('已更新简历')
+  // patch applied to the live resume
+  const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
+  await expect(summary).toHaveValue('教练更新后的专业简介，突出量化成果。')
+  // and undo reverts it
+  await page.getByTitle('撤销 (Ctrl+Z)').click()
+  await expect(summary).not.toHaveValue('教练更新后的专业简介，突出量化成果。')
+})
+
+test('JD tailoring creates and opens a tailored copy', async ({ page }) => {
+  let call = 0
+  await page.route('**/api/ai/**', route => {
+    call += 1
+    const content =
+      call === 1
+        ? JSON.stringify({ score: 60, missing_keywords: ['K8s'], strengths: [], suggestions: ['突出容器经验'] })
+        : JSON.stringify({
+            basics: { name: '陈嘉禾', title: '高级前端工程师', location: '上海', summary: '为该职位定制的简介' },
+            experience: [], projects: [], education: [], skills: [],
+          })
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content } }] }),
+    })
+  })
+  await page.goto('/?onboarding=0&panel=insight')
+  await page.getByRole('button', { name: 'JD 匹配' }).click()
+  await page.locator('.jd-input').fill('高级前端，要求 React 与 K8s')
+  await page.getByRole('button', { name: '开始分析' }).click()
+  await page.getByTestId('tailor-btn').click()
+  await expect(page.getByTestId('doc-switcher')).toContainText('定制版')
+  const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
+  await expect(summary).toHaveValue('为该职位定制的简介')
+  // original doc unchanged
+  await page.getByTestId('doc-switcher').click()
+  await page.locator('.docs-item', { hasText: /^我的简历/ }).first().click()
+  await expect(summary).not.toHaveValue('为该职位定制的简介')
+})

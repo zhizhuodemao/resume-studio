@@ -14,8 +14,9 @@ import Editor from './components/Editor.jsx'
 import Preview from './components/Preview.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import Insight from './components/Insight.jsx'
+import Coach from './components/Coach.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
-import { translateResume } from './ai.js'
+import { translateResume, applyCoachPatch } from './ai.js'
 
 let loadedFresh = false
 
@@ -95,9 +96,10 @@ const HISTORY_COALESCE_MS = 700
 export default function App() {
   const [state, setState] = useState(initialState)
   const [onboarding, setOnboarding] = useState(shouldShowOnboarding)
-  const [insightOpen, setInsightOpen] = useState(
-    () => new URLSearchParams(window.location.search).get('panel') === 'insight',
-  )
+  const [rightPanel, setRightPanel] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get('panel')
+    return p === 'insight' || p === 'coach' ? p : null
+  })
   const { lang, resumes, activeId } = state
   const active = resumes.find(d => d.id === activeId) || resumes[0]
   const t = MESSAGES[lang]
@@ -394,6 +396,35 @@ export default function App() {
     [patchDoc],
   )
 
+  /* ---------- L3 agents ---------- */
+  const handleCreateTailored = useCallback(
+    tailoredResume => {
+      const s = stateRef.current
+      const doc = s.resumes.find(d => d.id === s.activeId)
+      if (!doc) return
+      const copy = makeDoc({
+        ...doc,
+        name: `${doc.name || t.docs.untitled} · ${t.docs.tailoredSuffix}`,
+        resume: tailoredResume,
+      })
+      setState(cur => ({ ...cur, resumes: [...cur.resumes, copy], activeId: copy.id }))
+    },
+    [t],
+  )
+
+  const handleCoachPatch = useCallback(
+    patch => {
+      const s = stateRef.current
+      const doc = s.resumes.find(d => d.id === s.activeId)
+      if (!doc) return false
+      const next = applyCoachPatch(doc.resume, patch)
+      if (next === doc.resume) return false
+      setResume(next)
+      return true
+    },
+    [setResume],
+  )
+
   const placeholders = useMemo(() => getPlaceholders(active?.track, lang), [active?.track, lang])
 
   const resumeNode = useMemo(
@@ -447,20 +478,32 @@ export default function App() {
           translating={translating}
           canUndoTranslate={Boolean(translateBackup)}
           onUndoTranslate={handleUndoTranslate}
-          onToggleInsight={() => setInsightOpen(o => !o)}
+          onToggleInsight={() => setRightPanel(p => (p === 'insight' ? null : 'insight'))}
+          onToggleCoach={() => setRightPanel(p => (p === 'coach' ? null : 'coach'))}
         />
         <div className="app-body">
           <Editor t={t} resume={active.resume} setResume={setResume} placeholders={placeholders} />
           <Preview t={t} page={active.page} onFitToggle={handleFitToggle}>
             {resumeNode}
           </Preview>
-          {insightOpen && (
+          {rightPanel === 'insight' && (
             <Insight
               t={t}
               lang={lang}
               resume={active.resume}
               sectionsLabel={key => t.sections[key] || key}
-              onClose={() => setInsightOpen(false)}
+              onCreateTailored={handleCreateTailored}
+              onClose={() => setRightPanel(null)}
+            />
+          )}
+          {rightPanel === 'coach' && (
+            <Coach
+              key={activeId}
+              t={t}
+              lang={lang}
+              resume={active.resume}
+              onApplyPatch={handleCoachPatch}
+              onClose={() => setRightPanel(null)}
             />
           )}
         </div>

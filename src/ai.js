@@ -225,3 +225,98 @@ export async function matchJD(resume, jd, uiLang = 'zh') {
     suggestions: arr(parsed.suggestions),
   }
 }
+
+/* ---------- L3 agents ---------- */
+
+// JD tailoring: rewrites summary / highlights / details to emphasize
+// JD-relevant facts, reusing the translate merge path (index-aligned,
+// protected fields untouched). Returns a NEW resume object.
+export async function tailorResume(resume, jd, uiLang = 'zh') {
+  const system =
+    '你是资深简历教练。请根据目标职位描述（JD）定制这份简历：' +
+    '1) 改写 basics.summary 与各条 highlights/description，突出与 JD 最相关的技能、经验与成果；' +
+    '2) 可以调整每段经历内部要点的顺序（把最匹配的放前面）；' +
+    '3) skills 的 detail 可以强调与 JD 匹配的技术点；' +
+    '4) 只能使用简历中已有的事实与数字，绝对不允许编造新的经历、数字或技能；' +
+    '5) 保持简历原有语言，保持每行一条要点的格式。' +
+    '输出 JSON，结构与输入的 resume 对象完全一致（相同的键、相同的数组长度），只修改字符串内容。Respond with JSON only.'
+  const payload = JSON.stringify({ resume: extractTranslatable(resume), job_description: jd.slice(0, 6000) })
+  const result = await chat(
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: payload },
+    ],
+    { response_format: { type: 'json_object' } },
+  )
+  let parsed
+  try {
+    parsed = JSON.parse(result)
+  } catch {
+    throw new Error('AI returned invalid JSON')
+  }
+  const body = parsed.resume && typeof parsed.resume === 'object' ? parsed.resume : parsed
+  if (!body.basics) throw new Error('AI returned unexpected structure')
+  return mergeTranslated(resume, body)
+}
+
+// Resume coach: one interview turn. History is [{role, content}] of prior
+// user/assistant messages (assistant content = reply text only).
+export async function coachTurn(history, resume, uiLang = 'zh') {
+  const langNote = uiLang === 'zh' ? '用中文回复。' : 'Reply in English.'
+  const system =
+    '你是一位顶尖的简历教练，通过访谈帮助用户完善简历。工作方式：' +
+    '1) 每次只问一个具体、易回答的问题，优先追问缺失的量化数据（规模、百分比、金额、人数）与成果；' +
+    '2) 用户给出信息后，把它转写成专业的简历表达，并通过 patch 更新简历；' +
+    '3) 只使用用户明确提供的事实，绝不编造；用户没给数字就不要写数字；' +
+    '4) reply 保持口语化、简短（1-3 句），一次一个问题。' +
+    langNote +
+    `\n\n当前简历内容：\n${resumeDigest(resume)}\n\n` +
+    '严格输出 JSON：{"reply": "给用户的话", "patch": null 或 {' +
+    '"summary": "新的个人简介（可选）", ' +
+    '"experience": [{"index": 经历序号从0开始, "highlights": "该经历的完整要点（多行，每行一条）"}]（可选）, ' +
+    '"skills_add": [{"name": "技能名", "detail": "说明"}]（可选）}}。' +
+    'patch 只在确有内容可更新时给出，否则为 null。Respond with JSON only.'
+  const result = await chat(
+    [{ role: 'system', content: system }, ...history.slice(-12)],
+    { response_format: { type: 'json_object' } },
+  )
+  let parsed
+  try {
+    parsed = JSON.parse(result)
+  } catch {
+    throw new Error('AI returned invalid JSON')
+  }
+  const patch = parsed.patch && typeof parsed.patch === 'object' ? parsed.patch : null
+  return {
+    reply: typeof parsed.reply === 'string' && parsed.reply ? parsed.reply : '…',
+    patch,
+  }
+}
+
+// Apply a coach patch immutably; invalid parts are ignored.
+export function applyCoachPatch(resume, patch) {
+  if (!patch) return resume
+  let next = resume
+  if (typeof patch.summary === 'string' && patch.summary.trim()) {
+    next = { ...next, basics: { ...next.basics, summary: patch.summary } }
+  }
+  if (Array.isArray(patch.experience)) {
+    const experience = [...next.experience]
+    let touched = false
+    for (const p of patch.experience) {
+      const i = Number(p?.index)
+      if (Number.isInteger(i) && experience[i] && typeof p.highlights === 'string' && p.highlights.trim()) {
+        experience[i] = { ...experience[i], highlights: p.highlights }
+        touched = true
+      }
+    }
+    if (touched) next = { ...next, experience }
+  }
+  if (Array.isArray(patch.skills_add)) {
+    const additions = patch.skills_add
+      .filter(s => s && typeof s.name === 'string' && s.name.trim())
+      .map(s => ({ id: `coach-${Math.random().toString(36).slice(2, 9)}`, name: s.name, level: 3, detail: typeof s.detail === 'string' ? s.detail : '' }))
+    if (additions.length) next = { ...next, skills: [...next.skills, ...additions] }
+  }
+  return next
+}

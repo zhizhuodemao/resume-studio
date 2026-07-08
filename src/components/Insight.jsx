@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { checkResume } from '../checker.js'
-import { matchJD } from '../ai.js'
+import { matchJD, tailorResume } from '../ai.js'
 
 function ScoreRing({ score }) {
   const color = score >= 85 ? '#12b76a' : score >= 65 ? '#f59e0b' : '#ef4444'
@@ -31,11 +31,12 @@ function ScoreRing({ score }) {
 
 const LEVEL_ORDER = ['error', 'warn', 'info']
 
-export default function Insight({ t, lang, resume, sectionsLabel, onClose }) {
+export default function Insight({ t, lang, resume, sectionsLabel, onCreateTailored, onClose }) {
   const [tab, setTab] = useState('check')
   const [jd, setJd] = useState('')
   const [jdState, setJdState] = useState('idle') // idle | loading | done | error
   const [jdResult, setJdResult] = useState(null)
+  const [tailorState, setTailorState] = useState('idle') // idle | loading | done | error
 
   const report = useMemo(() => checkResume(resume, lang), [resume, lang])
 
@@ -48,6 +49,19 @@ export default function Insight({ t, lang, resume, sectionsLabel, onClose }) {
     } catch (err) {
       console.error(err)
       setJdState('error')
+    }
+  }
+
+  const runTailor = async () => {
+    if (tailorState === 'loading') return
+    setTailorState('loading')
+    try {
+      const tailored = await tailorResume(resume, jd, lang)
+      onCreateTailored(tailored)
+      setTailorState('done')
+    } catch (err) {
+      console.error(err)
+      setTailorState('error')
     }
   }
 
@@ -155,6 +169,16 @@ export default function Insight({ t, lang, resume, sectionsLabel, onClose }) {
                   </ul>
                 </div>
               )}
+              <button
+                className="btn btn-primary jd-run"
+                disabled={tailorState === 'loading'}
+                onClick={runTailor}
+                data-testid="tailor-btn"
+              >
+                {tailorState === 'loading' ? t.insight.tailoring : `✨ ${t.insight.tailor}`}
+              </button>
+              {tailorState === 'done' && <p className="insight-empty">{t.insight.tailored}</p>}
+              {tailorState === 'error' && <p className="ai-error">{t.ai.error}</p>}
             </div>
           )}
         </div>

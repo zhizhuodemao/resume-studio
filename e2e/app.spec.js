@@ -829,4 +829,65 @@ test('interview session is continuous across close and reload', async ({ page })
   await page.getByTestId('stage-btn').click()
   await expect(page.getByTestId('stage-question')).toContainText('问题 2')
   expect(calls).toBe(before) // restored, not re-asked
+  // one conversation, two lenses: the sidebar shows the same exchange
+  await page.getByTestId('stage-exit').click()
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant).toContainText('我做过一个后台系统')
+  await expect(assistant).toContainText('问题 2')
+})
+
+test('freshness sentinel: manual edits are announced to the model next turn', async ({ page }) => {
+  const captured = []
+  let calls = 0
+  await page.route('**/api/ai/**', route => {
+    captured.push(JSON.parse(route.request().postData()))
+    calls += 1
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: `回复 ${calls}` } }] }),
+    })
+  })
+  await page.goto('/?onboarding=0')
+  // turn 1 via the sidebar
+  await page.getByTestId('cmd-input').fill('你好')
+  await page.getByTestId('cmd-input').press('Enter')
+  await expect(page.getByTestId('assistant')).toContainText('回复 1')
+  const sys1 = captured[0].messages.find(m => m.role === 'system').content
+  expect(sys1).not.toContain('手动修改过')
+  // manual edit between turns
+  await openRefine(page)
+  await page.getByLabel('姓名').fill('手动改名者')
+  await expect(page.locator('.page')).toContainText('手动改名者')
+  // turn 2: the system prompt announces the manual change AND carries fresh state
+  await page.getByTestId('cmd-input').fill('继续')
+  await page.getByTestId('cmd-input').press('Enter')
+  await expect(page.getByTestId('assistant')).toContainText('回复 2')
+  const sys2 = captured[captured.length - 1].messages.find(m => m.role === 'system').content
+  expect(sys2).toContain('手动修改过')
+  expect(sys2).toContain('手动改名者')
+})
+
+test('stage shows the last answer echo and the transcript drawer', async ({ page }) => {
+  let calls = 0
+  await page.route('**/api/ai/**', route => {
+    calls += 1
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: `问题 ${calls}` } }] }),
+    })
+  })
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('stage-btn').click()
+  await page.getByTestId('stage-start').click()
+  await expect(page.getByTestId('stage-question')).toContainText('问题 1')
+  await page.getByTestId('stage-input').fill('我负责过支付系统')
+  await page.getByTestId('stage-input').press('Enter')
+  await expect(page.getByTestId('stage-question')).toContainText('问题 2')
+  // echo of what you just said
+  await expect(page.getByTestId('stage-echo')).toContainText('我负责过支付系统')
+  // transcript drawer holds the full exchange
+  await page.getByTestId('stage-log-btn').click()
+  const log = page.getByTestId('stage-log')
+  await expect(log).toContainText('问题 1')
+  await expect(log).toContainText('我负责过支付系统')
 })

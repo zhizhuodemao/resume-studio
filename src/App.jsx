@@ -110,6 +110,9 @@ export default function App() {
   const [mobileView, setMobileView] = useState('edit')
   const [refineOpen, setRefineOpen] = useState(false)
   const [stageOpen, setStageOpen] = useState(false)
+  const [chatEpoch, setChatEpoch] = useState(0)
+  // freshness sentinel: docs the AI saw at the end of its last turn
+  const lastSeenStampRef = useRef({})
   const [authUser, setAuthUser] = useState(null)
   const [loginOpen, setLoginOpen] = useState(false)
   const [dialog, setDialog] = useState(null) // { message, danger, alertOnly, resolve }
@@ -618,6 +621,8 @@ export default function App() {
         return { ok: true, changed: res.label.split('、') }
       }
 
+      const lastSeen = lastSeenStampRef.current[doc.id]
+      const manualChange = Boolean(lastSeen && lastSeen !== doc.updatedAt)
       let { message } = await runAgentLoop({
         history,
         getDoc: () => doc,
@@ -625,6 +630,7 @@ export default function App() {
         t,
         uiLang: s0.lang,
         mode: callbacks?.mode || 'assist',
+        manualChange,
         execute,
         callbacks,
       })
@@ -651,6 +657,9 @@ export default function App() {
       if (diff.length && live) {
         window.dispatchEvent(new CustomEvent('ai-updated', { detail: { labels: changedSections } }))
       }
+      // remember what the model last saw, so manual edits are announced next turn
+      const after = stateRef.current.resumes.find(d => d.id === s0.activeId)
+      if (after) lastSeenStampRef.current[doc.id] = after.updatedAt
       return {
         message,
         diff,
@@ -812,6 +821,7 @@ export default function App() {
             doc={active}
             vault={state.vault}
             authUser={authUser}
+            chatEpoch={chatEpoch}
             onRunTurn={runAssistantTurn}
             onUndoSnapshot={handleUndoSnapshot}
             onApplyPending={handleApplyPending}
@@ -902,7 +912,10 @@ export default function App() {
           doc={active}
           vault={state.vault}
           onRunTurn={runInterviewTurn}
-          onClose={() => setStageOpen(false)}
+          onClose={() => {
+            setStageOpen(false)
+            setChatEpoch(n => n + 1)
+          }}
           onSaveJd={jd => patchDoc({ jd, jdReport: null })}
           onSetLang={next => patch({ lang: next })}
           onImportResume={handleImportResumeText}

@@ -117,6 +117,7 @@ export async function runAgentLoop({
   t,
   uiLang = 'zh',
   mode = 'assist',
+  manualChange = false,
   execute,
   callbacks = {},
   maxIters = 8,
@@ -124,6 +125,9 @@ export async function runAgentLoop({
   const doc = getDoc()
   const vault = getVault ? getVault() : { stories: [] }
   const langNote = uiLang === 'zh' ? '始终用中文回复。' : 'Always reply in English.'
+  const freshnessNote = manualChange
+    ? '\n注意：自你上一轮回复之后，用户手动修改过简历（内容/模板/排版），对话历史中的旧描述可能过期 —— 一切以下方给出的最新状态为准。\n'
+    : ''
 
   if (mode === 'interview') {
     const target = pickInterviewTarget(vault)
@@ -137,6 +141,7 @@ export async function runAgentLoop({
       '5) 每次回复的结尾必须是且只有一个新问题。前面可以用一句话确认收到了什么（"记下了：转化率+27%"），不要复述长内容。\n' +
       '6) 用户明显想结束（说"先到这""结束"等）时：不再提问，总结本次挖到的东西。\n' +
       `当前挖掘方向：${target.hint}${target.storyId ? `（目标故事 id=${target.storyId}）` : ''}\n` +
+      freshnessNote +
       langNote +
       '\n\n' +
       (doc.jd ? `目标岗位 JD（提问优先对准它要求的能力）：\n${doc.jd.slice(0, 800)}\n\n` : '') +
@@ -155,6 +160,7 @@ export async function runAgentLoop({
     '6) update_resume_content 可修改：简介(summary)、基本信息(basics)、工作经历(experience)、项目(projects)、教育经历(education)——均按简历摘要中的序号 工作[i]/项目[i]/教育[i] 定位；新增条目用 experience_add/education_add/projects_add/skills_add。\n' +
     '7) 大任务（涉及 3 个以上板块）：先调用 plan_steps 列出计划，执行过程中每完成一步调用 mark_step_done 勾选。教练访谈优先针对"教练覆盖情况"中标记为 缺失/弱 的部分提问。用户粘贴 JD 时先调用 save_target_jd 保存。\n' +
     '8) 每次工具调用后你会收到 JSON 执行结果：ok=true 表示已生效（changed 列出实际修改的板块）；ok=false 表示没有产生任何修改（hint 说明原因，如序号不存在、字段不支持、内容与原文相同）——此时修正参数重试，不要重复相同的调用。全部完成后用一句话总结，不要罗列修改内容原文。\n' +
+    freshnessNote +
     langNote +
     '\n\n' +
     docContext(doc, t) +

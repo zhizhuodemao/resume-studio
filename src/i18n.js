@@ -118,6 +118,10 @@ export const MESSAGES = {
       micStart: '开始语音回答',
       micStop: '停止收音',
       finish: '先到这里',
+      youSaid: '你：',
+      handsFree: '连续对话（说完自动发送）',
+      showLog: '对话记录',
+      logYou: '你',
       storySaved: '素材已入库',
       receipt: (title, isNew, nMetrics) =>
         `${isNew ? '已存入' : '已更新'}故事「${title}」${nMetrics > 0 ? ` · +${nMetrics} 个数字` : ''}`,
@@ -502,6 +506,10 @@ export const MESSAGES = {
       micStart: 'Answer by voice',
       micStop: 'Stop listening',
       finish: 'Stop here',
+      youSaid: 'You: ',
+      handsFree: 'Hands-free (auto-send after you pause)',
+      showLog: 'Transcript',
+      logYou: 'You',
       storySaved: 'Saved to vault',
       receipt: (title, isNew, nMetrics) =>
         `${isNew ? 'Saved' : 'Updated'} story "${title}"${nMetrics > 0 ? ` · +${nMetrics} numbers` : ''}`,

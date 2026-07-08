@@ -3923,3 +3923,71 @@ input:focus-visible {
   color: #6941c6;
   text-decoration: underline;
 }
+
+/* Stage: last-answer echo, mode row, transcript drawer */
+.stage-echo {
+  font-size: 12.5px;
+  color: var(--text-3);
+  background: #f2f4f7;
+  border-radius: 999px;
+  padding: 6px 14px;
+  margin-top: 14px;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: msg-in var(--dur) var(--ease);
+}
+
+.stage-modes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 12px;
+}
+
+.stage-handsfree {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.stage-log-btn {
+  margin: 0;
+}
+
+.stage-log {
+  position: fixed;
+  right: 20px;
+  top: 60px;
+  bottom: 300px;
+  width: min(340px, 40vw);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 16px 48px -12px rgba(16, 24, 40, 0.2);
+  animation: pop-in var(--dur-fast) var(--ease);
+}
+
+.stage-log-row {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 6px 8px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.stage-log-user {
+  background: #f2f4f7;
+}
+
+.stage-log-row b {
+  margin-right: 6px;
+  color: #6941c6;
+}

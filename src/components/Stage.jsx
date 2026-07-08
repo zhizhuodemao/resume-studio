@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSpeech, speechSupported, logAsrSample } from '../speech.js'
 import { vaultStats } from '../vault.js'
+import { loadChat, persistChat, toModelHistory } from '../chat.js'
 
 // The Interview Stage: a full-screen focused surface for voice-first
 // rapid Q&A. One big question per screen; the mic is the protagonist;
@@ -8,16 +9,21 @@ import { vaultStats } from '../vault.js'
 // The session is continuous: it persists per document and resumes
 // exactly where it stopped, across close and reload.
 
-const stageKey = docId => `rs-stage-${docId}`
-
-function loadSession(docId) {
-  try {
-    const raw = JSON.parse(localStorage.getItem(stageKey(docId)) || 'null')
-    if (raw && Array.isArray(raw.messages) && raw.messages.length) return raw
-  } catch {
-    /* corrupted */
+// The Stage and the sidebar share ONE conversation per document —
+// two lenses over the same session (focused vs full-transcript).
+function bootstrap(docId) {
+  const messages = loadChat(docId)
+  const real = messages.filter(m => !m.welcome && !m.system)
+  const hasUserTurns = real.some(m => m.role === 'user')
+  const last = [...real].reverse().find(m => m.role === 'assistant')
+  const lastUser = [...real].reverse().find(m => m.role === 'user')
+  return {
+    messages,
+    resumed: hasUserTurns && Boolean(last),
+    question: hasUserTurns ? last?.content || '' : '',
+    lastAnswer: lastUser?.content || '',
+    asked: real.filter(m => m.role === 'assistant').length,
   }
-  return null
 }
 
 export default function Stage({
@@ -32,19 +38,22 @@ export default function Stage({
   onImportResume,
   resumeNode,
 }) {
-  const saved = useRef(loadSession(doc.id)).current
-  const [phase, setPhase] = useState(saved || doc.jd || vault.stories.length ? 'live' : 'entry')
+  const boot = useRef(bootstrap(doc.id)).current
+  const [phase, setPhase] = useState(boot.resumed || doc.jd || vault.stories.length ? 'live' : 'entry')
   const [entryMode, setEntryMode] = useState('jd') // jd | paste
   const [jdDraft, setJdDraft] = useState('')
   const [pasteDraft, setPasteDraft] = useState('')
   const [parsing, setParsing] = useState(false)
-  const [messages, setMessages] = useState(saved?.messages || [])
-  const [question, setQuestion] = useState(saved?.question || '')
+  const [messages, setMessages] = useState(boot.messages)
+  const [question, setQuestion] = useState(boot.question)
+  const [lastAnswer, setLastAnswer] = useState(boot.lastAnswer)
   const [busy, setBusy] = useState(false)
   const [input, setInput] = useState('')
   const [receipts, setReceipts] = useState([])
-  const [asked, setAsked] = useState(saved?.asked || 0)
+  const [asked, setAsked] = useState(boot.asked)
   const [needLogin, setNeedLogin] = useState(false)
+  const [showLog, setShowLog] = useState(false)
+  const [handsFree, setHandsFree] = useState(() => speechSupported())
   const startStats = useRef(vaultStats(vault))
   const rawTranscriptRef = useRef('')
   const inputRef = useRef(null)
@@ -55,36 +64,42 @@ export default function Stage({
     metrics: Math.max(0, stats.metrics - startStats.current.metrics),
   }
 
-  // continuous session: persist during live, clear when finished
+  // continuous session: every exchange lands in the shared per-doc chat
   useEffect(() => {
-    if (phase === 'live' && messages.length) {
-      try {
-        localStorage.setItem(
-          stageKey(doc.id),
-          JSON.stringify({ messages: messages.slice(-20), question, asked }),
-        )
-      } catch {
-        /* storage full */
-      }
-    }
-    if (phase === 'summary') localStorage.removeItem(stageKey(doc.id))
-  }, [phase, messages, question, asked, doc.id])
+    if (messages.length) persistChat(doc.id, messages)
+  }, [messages, doc.id])
 
+  const silenceTimer = useRef(null)
+  const inputRef2 = useRef('')
   const speech = useSpeech({
     lang: lang === 'zh' ? 'zh-CN' : 'en-US',
     onFinal: text => {
       rawTranscriptRef.current += text
-      setInput(v => (v ? v + text : text))
+      setInput(v => {
+        const next = v ? v + text : text
+        inputRef2.current = next
+        return next
+      })
+      if (handsFree) {
+        clearTimeout(silenceTimer.current)
+        silenceTimer.current = setTimeout(() => {
+          if (inputRef2.current.trim()) sendRef.current?.()
+        }, 2800)
+      }
     },
   })
+  useEffect(() => () => clearTimeout(silenceTimer.current), [])
 
   const runTurn = async userText => {
     setBusy(true)
-    const history = [...messages, ...(userText ? [{ role: 'user', content: userText }] : [])]
-    if (userText) setMessages(history)
+    const nextMsgs = [...messages, ...(userText ? [{ role: 'user', content: userText }] : [])]
+    if (userText) {
+      setMessages(nextMsgs)
+      setLastAnswer(userText)
+    }
     setQuestion('')
     try {
-      const result = await onRunTurn(history, {
+      const result = await onRunTurn([...toModelHistory(nextMsgs)], {
         onDelta: d => setQuestion(q => q + d),
         onAction: entry => {
           if (entry.status === 'done' && entry.receipt) {
@@ -96,6 +111,8 @@ export default function Stage({
       setMessages(ms => [...ms, { role: 'assistant', content: reply }])
       setQuestion(reply)
       setAsked(n => n + 1)
+      // hands-free rhythm: the mic reopens as soon as the next question lands
+      if (handsFree && speechSupported()) setTimeout(() => speech.start(), 300)
     } catch (err) {
       console.error(err)
       if (err.code === 'auth_required' || err.code === 'guest_trial_exhausted') {
@@ -109,7 +126,7 @@ export default function Stage({
   }
 
   // kick off the first question when entering live with no restored session
-  const kickedRef = useRef(Boolean(saved))
+  const kickedRef = useRef(Boolean(boot.resumed))
   useEffect(() => {
     if (phase === 'live' && !kickedRef.current) {
       kickedRef.current = true
@@ -119,14 +136,18 @@ export default function Stage({
   }, [phase])
 
   const send = () => {
-    const text = input.trim()
+    const text = inputRef2.current.trim() || input.trim()
     if (!text || busy) return
     if (rawTranscriptRef.current) logAsrSample(rawTranscriptRef.current, text)
     rawTranscriptRef.current = ''
+    clearTimeout(silenceTimer.current)
     speech.stop()
     setInput('')
+    inputRef2.current = ''
     runTurn(text)
   }
+  const sendRef = useRef(send)
+  sendRef.current = send
 
   const finish = () => {
     speech.stop()
@@ -244,6 +265,12 @@ export default function Stage({
             {question || (busy ? <span className="stage-thinking">{t.coach.thinking}</span> : '')}
           </div>
 
+          {lastAnswer && (
+            <div className="stage-echo" data-testid="stage-echo">
+              {t.stage.youSaid}{lastAnswer.slice(0, 80)}{lastAnswer.length > 80 ? '…' : ''}
+            </div>
+          )}
+
           <div className="stage-receipts">
             {receipts.map(r => (
               <div className="stage-receipt" key={r.id}>
@@ -272,7 +299,10 @@ export default function Stage({
                   value={input + (speech.interim ? ` ${speech.interim}` : '')}
                   placeholder={speech.listening ? t.stage.listening : t.stage.answerPlaceholder}
                   disabled={busy}
-                  onChange={e => setInput(e.target.value)}
+                  onChange={e => {
+                    setInput(e.target.value)
+                    inputRef2.current = e.target.value
+                  }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
@@ -299,9 +329,36 @@ export default function Stage({
                     {t.stage.finish}
                   </button>
                 </div>
+                <div className="stage-modes">
+                  {speechSupported() && (
+                    <label className="stage-handsfree" data-testid="handsfree-toggle">
+                      <input
+                        type="checkbox"
+                        checked={handsFree}
+                        onChange={e => setHandsFree(e.target.checked)}
+                      />
+                      {t.stage.handsFree}
+                    </label>
+                  )}
+                  <button className="stage-alt-link stage-log-btn" data-testid="stage-log-btn" onClick={() => setShowLog(v => !v)}>
+                    {t.stage.showLog}
+                  </button>
+                </div>
               </>
             )}
           </div>
+          {showLog && (
+            <div className="stage-log" data-testid="stage-log">
+              {messages
+                .filter(m => !m.welcome && !m.system && m.content)
+                .slice(-12)
+                .map((m, i) => (
+                  <div key={i} className={`stage-log-row stage-log-${m.role}`}>
+                    <b>{m.role === 'user' ? t.stage.logYou : '✦'}</b> {m.content}
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       )}
 

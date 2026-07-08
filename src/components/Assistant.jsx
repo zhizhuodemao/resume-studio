@@ -142,31 +142,10 @@ function DiffCard({ t, msg, onUndo, onAccept, onReject, onFocusSection }) {
   )
 }
 
-const CHAT_LIMIT = 40
-const chatKey = docId => `rs-chat-${docId}`
+import { loadChat, persistChat, toModelHistory } from '../chat.js'
 
-function loadChat(docId, welcome) {
-  try {
-    const raw = JSON.parse(localStorage.getItem(chatKey(docId)) || 'null')
-    if (Array.isArray(raw) && raw.length) return raw
-  } catch {
-    /* corrupted */
-  }
-  return [{ role: 'assistant', content: welcome }]
-}
-
-function persistChat(docId, messages) {
-  try {
-    const slim = messages.slice(-CHAT_LIMIT).map(m => {
-      const { snapshot, pending, actionLog, streaming, ...rest } = m
-      if (rest.plan) rest.plan = { steps: rest.plan.steps, ticks: rest.plan.ticks }
-      return rest
-    })
-    localStorage.setItem(chatKey(docId), JSON.stringify(slim))
-  } catch {
-    /* storage full */
-  }
-}
+const withWelcome = (msgs, welcome) =>
+  msgs.length ? msgs : [{ role: 'assistant', content: welcome, welcome: true }]
 
 export default function Assistant({
   t,
@@ -174,6 +153,7 @@ export default function Assistant({
   doc,
   vault,
   authUser,
+  chatEpoch,
   onRunTurn,
   onUndoSnapshot,
   onApplyPending,
@@ -185,7 +165,7 @@ export default function Assistant({
   initialMessage,
   onInitialSent,
 }) {
-  const [messages, setMessages] = useState(() => loadChat(doc.id, t.assistant.welcome))
+  const [messages, setMessages] = useState(() => withWelcome(loadChat(doc.id), t.assistant.welcome))
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [showFindings, setShowFindings] = useState(false)
@@ -208,9 +188,15 @@ export default function Assistant({
   useEffect(() => {
     if (docIdRef.current !== doc.id) {
       docIdRef.current = doc.id
-      setMessages(loadChat(doc.id, t.assistant.welcome))
+      setMessages(withWelcome(loadChat(doc.id), t.assistant.welcome))
     }
   }, [doc.id, t])
+
+  // the Stage writes to the same conversation; re-read when it closes
+  useEffect(() => {
+    if (chatEpoch > 0) setMessages(withWelcome(loadChat(doc.id), t.assistant.welcome))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatEpoch])
 
   useEffect(() => {
     persistChat(docIdRef.current, messages)
@@ -265,10 +251,7 @@ export default function Assistant({
     if (!text || busy) return
     setInput('')
     lastUserRef.current = text
-    const history = [
-      ...messages.filter(m => !m.system && m.content).map(m => ({ role: m.role, content: m.content })),
-      { role: 'user', content: text },
-    ]
+    const history = [...toModelHistory(messages), { role: 'user', content: text }]
     setMessages(ms => [
       ...ms,
       { role: 'user', content: text },

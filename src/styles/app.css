@@ -1557,28 +1557,38 @@ details[open] > summary .section-chevron {
 
 .coach-msg {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
 }
 
 .coach-msg-user {
-  align-items: flex-end;
+  justify-content: flex-end;
 }
 
 .coach-bubble {
-  max-width: 88%;
+  max-width: 100%;
   font-size: 12.5px;
   line-height: 1.6;
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 9px 13px;
+  border-radius: 14px;
   background: #f2f4f7;
   color: var(--text);
   white-space: pre-line;
 }
 
+/* speech-tail corners point at the speaker */
+.coach-msg-assistant .coach-bubble {
+  border-top-left-radius: 5px;
+}
+
 .coach-msg-user .coach-bubble {
   background: var(--ink);
   color: #fff;
+  border-top-right-radius: 5px;
+}
+
+.coach-msg-user .coach-msg-body {
+  max-width: 78%;
 }
 
 .coach-msg-error .coach-bubble {

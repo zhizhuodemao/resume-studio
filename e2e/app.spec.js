@@ -609,3 +609,36 @@ test('coach progress panel maps weak areas and prefills an interview', async ({ 
   await panel.locator('.coverage-row', { hasText: '工作经历' }).click()
   await expect(page.getByTestId('cmd-input')).toHaveValue(/围绕「工作经历」向我提问/)
 })
+
+test('conversation identity: user right-aligned dark, assistant left with avatar', async ({ page }) => {
+  await mockAgent(page, [{ content: '收到，这是一条测试回复。' }])
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('cmd-input').fill('这是用户消息')
+  await page.getByTestId('cmd-input').press('Enter')
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant).toContainText('这是一条测试回复')
+  const geo = await page.evaluate(() => {
+    const panel = document.querySelector('.assistant-list').getBoundingClientRect()
+    const userMsg = [...document.querySelectorAll('.coach-msg-user')].at(-1)
+    const aiMsg = [...document.querySelectorAll('.coach-msg-assistant')].at(-1)
+    const u = userMsg.querySelector('.coach-bubble').getBoundingClientRect()
+    const a = aiMsg.querySelector('.coach-bubble').getBoundingClientRect()
+    return {
+      userGapRight: panel.right - u.right,
+      userGapLeft: u.left - panel.left,
+      aiGapLeft: a.left - panel.left,
+      aiHasAvatar: Boolean(aiMsg.querySelector('.assistant-avatar')),
+      avatarBesideBubble:
+        Math.abs(
+          aiMsg.querySelector('.assistant-avatar').getBoundingClientRect().top -
+            a.top,
+        ) < 20,
+    }
+  })
+  // user bubble hugs the RIGHT edge, assistant hugs the left with an inline avatar
+  expect(geo.userGapRight).toBeLessThan(16)
+  expect(geo.userGapLeft).toBeGreaterThan(60)
+  expect(geo.aiGapLeft).toBeLessThan(60)
+  expect(geo.aiHasAvatar).toBe(true)
+  expect(geo.avatarBesideBubble).toBe(true)
+})

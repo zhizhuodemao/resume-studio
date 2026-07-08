@@ -21,7 +21,7 @@ describe('resumeToText', () => {
   it('serializes visible sections with markdown stripped', () => {
     const txt = resumeToText(resume, MESSAGES.zh)
     expect(txt).toContain('张三')
-    expect(txt).toContain('a@b.c | 138')
+    expect(txt).toContain('138 | a@b.c')
     expect(txt).toContain('- 主导 项目')
     expect(txt).not.toContain('**')
     expect(txt).toContain('- SQL: 熟练')

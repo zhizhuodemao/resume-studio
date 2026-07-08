@@ -1521,30 +1521,15 @@ details[open] > summary .section-chevron {
   .toolbar {
     flex-wrap: wrap;
     height: auto;
-    padding: 10px 16px;
-    gap: 10px;
+    padding: 10px 14px;
+    gap: 8px 12px;
   }
 
-  .toolbar-center {
-    order: 3;
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .app-body {
-    flex-direction: column;
-    overflow: auto;
-  }
-
-  .editor {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    overflow: visible;
+  .toolbar-actions {
+    margin-left: auto;
   }
 
   .preview {
-    overflow: visible;
     padding: 20px 12px 8px;
   }
 }
@@ -1744,15 +1729,29 @@ details[open] > summary .section-chevron {
     padding-bottom: 46px;
   }
 
-  .app-body.mobile-edit .preview,
-  .app-body.mobile-edit .insight-drawer,
-  .app-body.mobile-edit .coach-drawer {
+  .app-body.mobile-edit .preview {
     display: none;
   }
 
-  .app-body.mobile-preview .editor {
-    display: none;
+  .toolbar {
+    padding: 8px 10px;
+    gap: 6px 10px;
   }
+
+  .toolbar .btn {
+    padding: 7px 10px;
+    font-size: 12.5px;
+  }
+
+  .doc-switcher {
+    max-width: 130px;
+  }
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
 }
 
 /* Render error fallback */
@@ -2041,7 +2040,14 @@ details[open] > summary .section-chevron {
 
 .assistant-health-toggle {
   color: var(--text-3);
-  font-size: 11px;
+  font-size: 13px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef1f5;
+  flex-shrink: 0;
 }
 
 .assistant-findings {
@@ -2109,15 +2115,20 @@ details[open] > summary .section-chevron {
 .assistant-suggestions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 2px;
+  gap: 8px;
+  padding: 10px 2px 4px;
 }
 
 .assistant-input {
   margin-top: 10px;
   border-radius: 16px;
   flex-shrink: 0;
-  align-items: flex-end;
+  align-items: center;
+}
+
+.assistant-input .cmd-send {
+  padding: 7px 14px;
+  font-size: 12.5px;
 }
 
 .assistant-input textarea {

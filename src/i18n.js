@@ -158,7 +158,7 @@ export const MESSAGES = {
     assistant: {
       welcome:
         '你好，我是你的 AI 简历助手。你可以直接吩咐我改内容、换模板、调排版，也可以把 JD 粘贴给我做匹配分析，或者聊聊你的经历——我会像教练一样帮你把它写进简历。',
-      placeholder: '吩咐 AI，或粘贴 JD、聊聊你的经历…',
+      placeholder: '吩咐 AI，或粘贴 JD…',
       findings: n => `${n} 条优化建议`,
       undone: '已撤销',
       jdIntro: jd => `这是我目标职位的 JD，请帮我分析匹配度并给出优化建议：\n\n${jd}`,
@@ -445,7 +445,7 @@ export const MESSAGES = {
     assistant: {
       welcome:
         "Hi, I'm your AI resume assistant. Tell me to edit content, switch templates or tune the layout; paste a JD for a match analysis; or just talk about your experience — I'll coach it into the resume.",
-      placeholder: 'Ask AI, paste a JD, or talk about your experience…',
+      placeholder: 'Ask AI or paste a JD…',
       findings: n => `${n} suggestion${n > 1 ? 's' : ''}`,
       undone: 'Undone',
       jdIntro: jd => `Here is the JD for my target role — please analyze the match and suggest edits:\n\n${jd}`,

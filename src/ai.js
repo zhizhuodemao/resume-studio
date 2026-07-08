@@ -66,7 +66,7 @@ export async function polishText(text, { kind = 'highlights', role, company, nam
 
 // Only translatable text fields travel to the model; ids, dates, links,
 // levels, photo and section config stay local and are merged back by index.
-function extractTranslatable(resume) {
+export function extractTranslatable(resume) {
   return {
     basics: {
       name: resume.basics.name,
@@ -91,7 +91,7 @@ function extractTranslatable(resume) {
   }
 }
 
-function mergeTranslated(resume, tr) {
+export function mergeTranslated(resume, tr) {
   const pickStr = (v, fallback) => (typeof v === 'string' ? v : fallback)
   const mergeList = (orig, translated, fields) =>
     orig.map((item, i) => {

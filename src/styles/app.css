@@ -618,6 +618,88 @@ textarea {
   line-height: 1.5;
 }
 
+/* Doc switcher & undo */
+.doc-switcher {
+  max-width: 200px;
+}
+
+.doc-switcher-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.popover-docs {
+  width: 300px;
+  padding: 8px;
+}
+
+.docs-list {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.docs-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.docs-item:hover {
+  background: #f2f4f7;
+}
+
+.docs-item.active {
+  background: #eef1f6;
+}
+
+.docs-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docs-item-date {
+  font-size: 11px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.docs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.docs-actions + .docs-actions {
+  margin-top: 8px;
+}
+
+.undo-group {
+  display: flex;
+  gap: 2px;
+}
+
+.toolbar-icon-btn {
+  width: 30px;
+  height: 30px;
+}
+
 /* AI assist */
 .ai-assist {
   display: flex;

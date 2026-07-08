@@ -20,7 +20,8 @@ const TEMPLATES = {
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES)
 
-export const DEFAULT_TYPOGRAPHY = { font: 'default', size: 'm', density: 'normal' }
+export { DEFAULT_TYPOGRAPHY } from '../store.js'
+import { DEFAULT_TYPOGRAPHY } from '../store.js'
 
 export default function Resume({ template, resume, accent, typography = DEFAULT_TYPOGRAPHY, t }) {
   const Template = TEMPLATES[template] || ModernTemplate

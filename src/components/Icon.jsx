@@ -17,6 +17,9 @@ const PATHS = {
   plus: 'M12 5v14M5 12h14',
   download: 'M12 3v12m-5-5 5 5 5-5M4 21h16',
   chevron: 'M9 6l6 6-6 6',
+  undo: 'M8 5 4 9l4 4M4 9h10a6 6 0 0 1 0 12h-4',
+  redo: 'M16 5l4 4-4 4M20 9H10a6 6 0 0 0 0 12h4',
+  file: 'M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm8 0v5h5',
 }
 
 export default function Icon({ name, size = 16, className = '' }) {

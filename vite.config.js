@@ -5,6 +5,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
     plugins: [react()],
+    test: {
+      environment: 'node',
+      include: ['src/**/*.test.js'],
+    },
     server: {
       proxy: {
         // Dev-only AI proxy: the API key is injected server-side by Vite and

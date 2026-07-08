@@ -168,6 +168,20 @@ export default function Toolbar({
   track,
   savedAt,
   onPatch,
+  onPatchDoc,
+  docs,
+  activeDoc,
+  onSwitchDoc,
+  onCreateDoc,
+  onDuplicateDoc,
+  onRenameDoc,
+  onDeleteDoc,
+  onExportDoc,
+  onImportDoc,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onApplySample,
   onClear,
   onExport,
@@ -182,6 +196,8 @@ export default function Toolbar({
   const typoPop = usePopover(initialMenu === 'typo')
   const samplePop = usePopover(initialMenu === 'sample')
   const aiPop = usePopover(initialMenu === 'ai')
+  const docsPop = usePopover(initialMenu === 'docs')
+  const importInputRef = useRef(null)
   const [selTrack, setSelTrack] = useState(track || 'tech')
   const [selStage, setSelStage] = useState('social')
 
@@ -190,7 +206,7 @@ export default function Toolbar({
     if (!hasStage(tr, selStage)) setSelStage('social')
   }
 
-  const setTypo = patch => onPatch({ typography: { ...typography, ...patch } })
+  const setTypo = patch => onPatchDoc({ typography: { ...typography, ...patch } })
 
   return (
     <header className="toolbar">
@@ -200,6 +216,79 @@ export default function Toolbar({
           <div className="brand-name">{t.appName}</div>
           <div className="brand-tag">{t.tagline}</div>
         </div>
+      </div>
+
+      <div className="popover-wrap" ref={docsPop.ref}>
+        <button
+          className={`btn btn-select doc-switcher ${docsPop.open ? 'open' : ''}`}
+          onClick={() => docsPop.setOpen(!docsPop.open)}
+          data-testid="doc-switcher"
+        >
+          <Icon name="file" size={14} />
+          <b className="doc-switcher-name">{activeDoc.name || t.docs.untitled}</b>
+          <Icon name="chevron" size={13} className="select-chevron" />
+        </button>
+        {docsPop.open && (
+          <div className="popover popover-docs">
+            <div className="docs-list">
+              {docs.map(d => (
+                <button
+                  key={d.id}
+                  className={`docs-item ${d.id === activeDoc.id ? 'active' : ''}`}
+                  onClick={() => {
+                    onSwitchDoc(d.id)
+                    docsPop.setOpen(false)
+                  }}
+                >
+                  <span className="docs-item-name">{d.name || t.docs.untitled}</span>
+                  <span className="docs-item-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
+                </button>
+              ))}
+            </div>
+            <div className="docs-actions">
+              <button className="btn btn-small" onClick={() => { onCreateDoc(); docsPop.setOpen(false) }}>
+                {t.docs.new}
+              </button>
+              <button className="btn btn-small" onClick={() => { onDuplicateDoc(); docsPop.setOpen(false) }}>
+                {t.docs.duplicate}
+              </button>
+              <button className="btn btn-small" onClick={() => { onRenameDoc(); docsPop.setOpen(false) }}>
+                {t.docs.rename}
+              </button>
+              <button className="btn btn-small btn-danger" onClick={() => { onDeleteDoc(); docsPop.setOpen(false) }}>
+                {t.docs.delete}
+              </button>
+            </div>
+            <div className="docs-actions">
+              <button className="btn btn-small" onClick={onExportDoc}>
+                {t.docs.export}
+              </button>
+              <button className="btn btn-small" onClick={() => importInputRef.current?.click()}>
+                {t.docs.import}
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".json,application/json"
+                hidden
+                onChange={e => {
+                  onImportDoc(e.target.files[0])
+                  e.target.value = ''
+                  docsPop.setOpen(false)
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="undo-group">
+        <button className="icon-btn toolbar-icon-btn" disabled={!canUndo} title={t.docs.undo} onClick={onUndo}>
+          <Icon name="undo" size={15} />
+        </button>
+        <button className="icon-btn toolbar-icon-btn" disabled={!canRedo} title={t.docs.redo} onClick={onRedo}>
+          <Icon name="redo" size={15} />
+        </button>
       </div>
 
       <div className="toolbar-center">
@@ -218,7 +307,7 @@ export default function Toolbar({
                   aria-checked={template === id}
                   className={`template-card ${template === id ? 'active' : ''}`}
                   onClick={() => {
-                    onPatch({ template: id })
+                    onPatchDoc({ template: id })
                     tplPop.setOpen(false)
                   }}
                 >
@@ -272,11 +361,11 @@ export default function Toolbar({
               className={`accent-swatch ${accent === c ? 'active' : ''}`}
               style={{ background: c }}
               title={c}
-              onClick={() => onPatch({ accent: c })}
+              onClick={() => onPatchDoc({ accent: c })}
             />
           ))}
           <label className="accent-custom" title={t.accentColor}>
-            <input type="color" value={accent} onChange={e => onPatch({ accent: e.target.value })} />
+            <input type="color" value={accent} onChange={e => onPatchDoc({ accent: e.target.value })} />
             <span
               className={`accent-swatch rainbow ${ACCENT_PRESETS.includes(accent) ? '' : 'active'}`}
               style={ACCENT_PRESETS.includes(accent) ? undefined : { background: accent }}

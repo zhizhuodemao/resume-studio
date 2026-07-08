@@ -1872,3 +1872,130 @@ details[open] > summary .section-chevron {
     padding: 8px 10px;
   }
 }
+
+/* AI command dock — the beginning of the AI-first design language */
+.cmd-dock {
+  position: sticky;
+  bottom: 14px;
+  z-index: 40;
+  width: min(640px, 94%);
+  margin: 8px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cmd-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px 9px 16px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(120deg, #7c3aed, #2563eb, #0d9488) border-box;
+  box-shadow:
+    0 10px 32px -8px rgba(37, 99, 235, 0.25),
+    0 2px 8px rgba(16, 24, 40, 0.08);
+}
+
+.cmd-bar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  font-size: 13.5px;
+  background: transparent;
+  color: var(--text);
+}
+
+.cmd-bar input::placeholder {
+  color: var(--text-3);
+}
+
+.cmd-spark {
+  background: linear-gradient(120deg, #7c3aed, #2563eb);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.cmd-bar.busy .cmd-spark {
+  animation: spark-pulse 1s ease-in-out infinite;
+}
+
+@keyframes spark-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(1.25); }
+}
+
+.cmd-kbd {
+  font-size: 10.5px;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 6px;
+  background: #f7f8fa;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.cmd-send {
+  border-radius: 999px;
+  padding: 7px 16px;
+}
+
+.cmd-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow:
+    0 12px 32px -8px rgba(16, 24, 40, 0.18),
+    0 2px 6px rgba(16, 24, 40, 0.06);
+}
+
+.cmd-card-error {
+  border-color: #fecdca;
+  background: #fffbfa;
+}
+
+.cmd-card-msg {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.cmd-card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0 23px;
+}
+
+.cmd-chip {
+  font-size: 11px;
+  font-weight: 500;
+  color: #175cd3;
+  background: #eff4ff;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.cmd-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .cmd-kbd {
+    display: none;
+  }
+}

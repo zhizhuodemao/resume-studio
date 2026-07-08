@@ -19,6 +19,8 @@ import Coach from './components/Coach.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
 import { translateResume, applyCoachPatch } from './ai.js'
 import { downloadDocx, downloadText } from './exporters.js'
+import { commandTurn, applyCommandAction } from './commander.js'
+import CommandBar from './components/CommandBar.jsx'
 
 let loadedFresh = false
 
@@ -103,6 +105,9 @@ export default function App() {
     return p === 'insight' || p === 'coach' ? p : null
   })
   const [mobileView, setMobileView] = useState('edit')
+  const [cmdBusy, setCmdBusy] = useState(false)
+  const [cmdCards, setCmdCards] = useState([])
+  const measureRef = useRef({ content: 0, page: 1123 })
   const { lang, resumes, activeId } = state
   const active = resumes.find(d => d.id === activeId) || resumes[0]
   const t = MESSAGES[lang]
@@ -428,6 +433,97 @@ export default function App() {
     [setResume],
   )
 
+  /* ---------- AI command bar ---------- */
+  const handleCommand = useCallback(
+    async instruction => {
+      const s0 = stateRef.current
+      const doc = s0.resumes.find(d => d.id === s0.activeId)
+      if (!doc || cmdBusy) return
+      setCmdBusy(true)
+      const snapshot = {
+        template: doc.template,
+        accent: doc.accent,
+        typography: doc.typography,
+        page: doc.page,
+        resume: doc.resume,
+      }
+      try {
+        const { message, actions } = await commandTurn(instruction, doc, t)
+        let cur = { ...doc }
+        const labels = []
+        let wantsFit = false
+        let translateTarget = null
+        for (const a of actions) {
+          if (a.name === 'translate_resume') {
+            translateTarget = a.args?.target === 'en' ? 'en' : 'zh'
+            continue
+          }
+          const res = applyCommandAction(cur, a, t)
+          if (res) {
+            cur = res.doc
+            labels.push(res.label)
+            if (res.wantsFit) wantsFit = true
+          }
+        }
+        if (translateTarget) {
+          cur = { ...cur, resume: await translateResume(cur.resume, translateTarget) }
+          labels.push(t.cmd.labels.translate)
+        }
+        const changed = labels.length > 0
+        if (changed) {
+          pushHistory(s0.activeId, doc.resume)
+          patchDoc({
+            template: cur.template,
+            accent: cur.accent,
+            typography: cur.typography,
+            page: cur.page,
+            resume: cur.resume,
+          })
+          if (wantsFit) {
+            setTimeout(() => {
+              const m = measureRef.current
+              if (m.content > m.page) {
+                const scale = Math.max(0.75, Math.min(1, (m.page - 4) / m.content))
+                if (scale < 0.995) patchDoc({ page: { ...cur.page, fitScale: Math.round(scale * 100) / 100 } })
+              }
+            }, 450)
+          }
+        }
+        setCmdCards(cs => [
+          ...cs.slice(-2),
+          {
+            id: `${Date.now()}-${cs.length}`,
+            message: message || (changed ? t.cmd.done : t.cmd.noop),
+            labels,
+            snapshot: changed ? snapshot : null,
+          },
+        ])
+      } catch (err) {
+        console.error(err)
+        setCmdCards(cs => [
+          ...cs.slice(-2),
+          { id: `${Date.now()}-e`, message: t.ai.error, labels: [], snapshot: null, error: true },
+        ])
+      } finally {
+        setCmdBusy(false)
+      }
+    },
+    [t, cmdBusy, pushHistory, patchDoc],
+  )
+
+  const handleUndoCard = useCallback(
+    id => {
+      setCmdCards(cs => {
+        const card = cs.find(c => c.id === id)
+        if (card?.snapshot) patchDoc(card.snapshot)
+        return cs.filter(c => c.id !== id)
+      })
+    },
+    [patchDoc],
+  )
+
+  const handleDismissCard = useCallback(id => setCmdCards(cs => cs.filter(c => c.id !== id)), [])
+
   const handleExportDocx = () => active && downloadDocx(active.resume, t, active.name || 'resume')
   const handleExportText = () => active && downloadText(active.resume, t, active.name || 'resume')
   const handleChangeCover = useCallback(cover => patchDoc({ coverLetter: cover }), [patchDoc])
@@ -513,7 +609,25 @@ export default function App() {
             coverLetter={active.coverLetter}
             onChangeCover={handleChangeCover}
           />
-          <Preview t={t} page={active.page} onFitToggle={handleFitToggle} extraPage={coverNode}>
+          <Preview
+            t={t}
+            page={active.page}
+            onFitToggle={handleFitToggle}
+            extraPage={coverNode}
+            onMeasure={m => {
+              measureRef.current = m
+            }}
+            commandBar={
+              <CommandBar
+                t={t}
+                busy={cmdBusy}
+                cards={cmdCards}
+                onSubmit={handleCommand}
+                onUndoCard={handleUndoCard}
+                onDismissCard={handleDismissCard}
+              />
+            }
+          >
             <ErrorBoundary
               resetKey={`${active.id}:${active.template}`}
               message={t.renderError}

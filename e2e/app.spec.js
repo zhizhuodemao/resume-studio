@@ -324,3 +324,35 @@ test('AI menu and more menu expose the consolidated actions', async ({ page }) =
   await expect(page.getByRole('button', { name: '清空内容' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'EN' })).toBeVisible()
 })
+
+test('AI command bar executes tool calls and supports card undo', async ({ page }) => {
+  await page.route('**/api/ai/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: {
+          content: '好的，已切换到时间线模板并更新了简介。',
+          tool_calls: [
+            { id: '1', type: 'function', function: { name: 'set_template', arguments: '{"template":"timeline"}' } },
+            { id: '2', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '命令栏更新的简介' }) } },
+          ],
+        } }],
+      }),
+    }),
+  )
+  await page.goto('/?onboarding=0')
+  const input = page.getByTestId('cmd-input')
+  await input.fill('换成时间线模板，简介重写一下')
+  await input.press('Enter')
+  // actions applied
+  await expect(page.locator('.preview .resume.tpl-timeline')).toHaveCount(1)
+  const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
+  await expect(summary).toHaveValue('命令栏更新的简介')
+  // change card with labels
+  const card = page.locator('.cmd-card')
+  await expect(card).toContainText('时间线')
+  // undo restores everything
+  await card.getByRole('button', { name: '撤销此次修改' }).click()
+  await expect(page.locator('.preview .resume.tpl-modern')).toHaveCount(1)
+  await expect(summary).not.toHaveValue('命令栏更新的简介')
+})

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { PAGE_DIMENSIONS } from '../store.js'
 
-export default function Preview({ t, page, onFitToggle, extraPage, children }) {
+export default function Preview({ t, page, onFitToggle, extraPage, onMeasure, commandBar, children }) {
   const dims = PAGE_DIMENSIONS[page?.size] || PAGE_DIMENSIONS.a4
   const fitActive = Boolean(page?.fitScale && page.fitScale < 1)
 
@@ -17,6 +17,7 @@ export default function Preview({ t, page, onFitToggle, extraPage, children }) {
       const available = area.clientWidth - 64
       setScale(Math.min(1, available / dims.width))
       setContentHeight(pageEl.offsetHeight)
+      onMeasure?.({ content: pageEl.offsetHeight, page: dims.height })
     }
     const ro = new ResizeObserver(update)
     ro.observe(area)
@@ -86,6 +87,7 @@ export default function Preview({ t, page, onFitToggle, extraPage, children }) {
           </button>
         )}
       </p>
+      {commandBar}
     </main>
   )
 }

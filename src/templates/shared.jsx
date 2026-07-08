@@ -25,25 +25,72 @@ export const buildContacts = basics =>
 const itemHasContent = item =>
   Object.entries(item).some(([k, v]) => k !== 'id' && typeof v === 'string' && v.trim())
 
+export const getCustomSection = (resume, key) =>
+  (resume.customSections || []).find(c => `custom:${c.id}` === key) || null
+
 export function visibleSections(resume) {
   return resume.sectionOrder.filter(key => {
     if (resume.hiddenSections.includes(key)) return false
     if (key === 'summary') return Boolean(resume.basics.summary.trim())
+    if (key.startsWith('custom:')) {
+      const sec = getCustomSection(resume, key)
+      return Boolean(sec && sec.items.length > 0 && sec.items.some(itemHasContent))
+    }
     const items = resume[key]
-    return items.length > 0 && items.some(itemHasContent)
+    return Array.isArray(items) && items.length > 0 && items.some(itemHasContent)
   })
 }
 
 export const nonEmptyItems = items => items.filter(itemHasContent)
 
+/* ---------- Inline rich text: **bold**, *italic*, [text](url) ---------- */
+
+export function parseInline(text) {
+  const re = /(\*\*([^*\n]+)\*\*)|(\*([^*\n]+)\*)|(\[([^\]\n]+)\]\(([^)\s]+)\))/g
+  const out = []
+  let last = 0
+  let m
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push({ type: 'text', text: text.slice(last, m.index) })
+    if (m[2] != null) out.push({ type: 'bold', text: m[2] })
+    else if (m[4] != null) out.push({ type: 'italic', text: m[4] })
+    else out.push({ type: 'link', text: m[6], href: m[7] })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push({ type: 'text', text: text.slice(last) })
+  return out
+}
+
+export function renderInline(text) {
+  if (!text) return null
+  return parseInline(text).map((seg, i) => {
+    if (seg.type === 'bold') return <strong key={i}>{seg.text}</strong>
+    if (seg.type === 'italic') return <em key={i}>{seg.text}</em>
+    if (seg.type === 'link') {
+      const href = /^https?:\/\//.test(seg.href) ? seg.href : `https://${seg.href}`
+      return (
+        <a key={i} className="r-inline-link" href={href}>
+          {seg.text}
+        </a>
+      )
+    }
+    return seg.text
+  })
+}
+
+export function Para({ className = '', text }) {
+  if (!text || !text.trim()) return null
+  return <p className={className}>{renderInline(text)}</p>
+}
+
 export function Bullets({ text, className = '' }) {
   const lines = splitLines(text)
   if (!lines.length) return null
-  if (lines.length === 1) return <p className={`r-para ${className}`}>{lines[0]}</p>
+  if (lines.length === 1) return <p className={`r-para ${className}`}>{renderInline(lines[0])}</p>
   return (
     <ul className={`r-bullets ${className}`}>
       {lines.map((line, i) => (
-        <li key={i}>{line}</li>
+        <li key={i}>{renderInline(line)}</li>
       ))}
     </ul>
   )

@@ -98,3 +98,23 @@ describe('parseImport', () => {
     expect(() => parseImport('[1,2,3]')).toThrow('unrecognized')
   })
 })
+
+describe('custom sections normalization', () => {
+  it('normalizes customSections and reconciles sectionOrder', () => {
+    const out = normalizeResume({
+      basics: {},
+      customSections: [{ id: 'c9', title: '证书', items: [{ title: 'PMP' }] }],
+      sectionOrder: ['summary', 'custom:c9', 'custom:orphan', 'experience'],
+    })
+    expect(out.customSections[0].items[0].title).toBe('PMP')
+    expect(typeof out.customSections[0].items[0].id).toBe('string')
+    expect(out.sectionOrder).not.toContain('custom:orphan')
+    expect(out.sectionOrder.filter(k => k === 'custom:c9')).toHaveLength(1)
+    // core sections never get lost
+    for (const k of DEFAULT_SECTION_ORDER) expect(out.sectionOrder).toContain(k)
+  })
+  it('appends custom keys missing from sectionOrder', () => {
+    const out = normalizeResume({ basics: {}, customSections: [{ id: 'c1', title: 'X', items: [] }] })
+    expect(out.sectionOrder).toContain('custom:c1')
+  })
+})

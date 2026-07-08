@@ -1,4 +1,4 @@
-import { Bullets, ContactList, dateRange, nonEmptyItems, visibleSections } from './shared.jsx'
+import { Bullets, ContactList, Para, dateRange, getCustomSection, nonEmptyItems, visibleSections } from './shared.jsx'
 
 function Section({ title, children }) {
   return (
@@ -32,7 +32,7 @@ export default function TimelineTemplate({ resume, t }) {
   const render = {
     summary: () => (
       <Section key="summary" title={t.sections.summary}>
-        <p className="r-para">{basics.summary}</p>
+        <Para className="r-para" text={basics.summary} />
       </Section>
     ),
     experience: () => (
@@ -77,7 +77,7 @@ export default function TimelineTemplate({ resume, t }) {
               primary={item.school}
               secondary={[item.degree, item.major].filter(Boolean).join(' · ')}
             >
-              {item.description && <p className="r-para">{item.description}</p>}
+              {item.description && <Para className="r-para" text={item.description} />}
             </TimelineEntry>
           ))}
         </div>
@@ -97,6 +97,18 @@ export default function TimelineTemplate({ resume, t }) {
     ),
   }
 
+  const renderCustom = sec => (
+    <Section key={`custom:${sec.id}`} title={sec.title}>
+      <div className="tl-items">
+        {nonEmptyItems(sec.items).map(item => (
+          <TimelineEntry key={item.id} dates={item.meta} primary={item.title} secondary={item.subtitle}>
+            <Bullets text={item.description} />
+          </TimelineEntry>
+        ))}
+      </div>
+    </Section>
+  )
+
   return (
     <div className="tl-root">
       <header className="tl-header">
@@ -106,7 +118,9 @@ export default function TimelineTemplate({ resume, t }) {
         </div>
         <ContactList basics={basics} className="tl-contacts" />
       </header>
-      {visibleSections(resume).map(key => render[key]())}
+      {visibleSections(resume).map(key =>
+        key.startsWith('custom:') ? renderCustom(getCustomSection(resume, key)) : render[key](),
+      )}
     </div>
   )
 }

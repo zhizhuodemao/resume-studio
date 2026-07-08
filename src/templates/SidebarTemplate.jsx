@@ -1,5 +1,5 @@
 import Icon from '../components/Icon.jsx'
-import { Bullets, buildContacts, dateRange, nonEmptyItems, visibleSections } from './shared.jsx'
+import { Bullets, Para, buildContacts, dateRange, getCustomSection, nonEmptyItems, visibleSections } from './shared.jsx'
 
 const SIDE_KEYS = ['skills', 'education']
 
@@ -58,7 +58,7 @@ export default function SidebarTemplate({ resume, t }) {
   const mainRender = {
     summary: () => (
       <MainSection key="summary" title={t.sections.summary}>
-        <p className="r-para">{basics.summary}</p>
+        <Para className="r-para" text={basics.summary} />
       </MainSection>
     ),
     experience: () => (
@@ -102,6 +102,23 @@ export default function SidebarTemplate({ resume, t }) {
     skills: () => null,
   }
 
+  const renderCustom = sec => (
+    <MainSection key={`custom:${sec.id}`} title={sec.title}>
+      {nonEmptyItems(sec.items).map(item => (
+        <div className="s-entry" key={item.id}>
+          <div className="s-entry-head">
+            <div className="s-entry-titles">
+              {item.title && <span className="s-entry-role">{item.title}</span>}
+              {item.subtitle && <span className="s-entry-company">{item.subtitle}</span>}
+            </div>
+            {item.meta && <span className="s-entry-dates">{item.meta}</span>}
+          </div>
+          <Bullets text={item.description} />
+        </div>
+      ))}
+    </MainSection>
+  )
+
   return (
     <div className="s-layout">
       <div className="s-side-print-bg" aria-hidden="true" />
@@ -129,7 +146,9 @@ export default function SidebarTemplate({ resume, t }) {
           <h1 className="s-name">{basics.name}</h1>
           {basics.title && <div className="s-title">{basics.title}</div>}
         </header>
-        {sections.filter(k => !SIDE_KEYS.includes(k)).map(key => mainRender[key]())}
+        {sections.filter(k => !SIDE_KEYS.includes(k)).map(key =>
+          key.startsWith('custom:') ? renderCustom(getCustomSection(resume, key)) : mainRender[key](),
+        )}
       </main>
     </div>
   )

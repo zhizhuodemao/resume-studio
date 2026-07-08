@@ -1,4 +1,4 @@
-import { Bullets, buildContacts, dateRange, nonEmptyItems, visibleSections } from './shared.jsx'
+import { Bullets, Para, buildContacts, dateRange, getCustomSection, nonEmptyItems, visibleSections } from './shared.jsx'
 
 function Section({ label, children }) {
   return (
@@ -30,7 +30,7 @@ export default function MinimalTemplate({ resume, t }) {
   const render = {
     summary: () => (
       <Section key="summary" label={t.sections.summary}>
-        <p className="r-para mn-summary">{basics.summary}</p>
+        <Para className="r-para mn-summary" text={basics.summary} />
       </Section>
     ),
     experience: () => (
@@ -69,7 +69,7 @@ export default function MinimalTemplate({ resume, t }) {
             secondary={[item.degree, item.major].filter(Boolean).join(' · ')}
             dates={dateRange(item.start, item.end, present)}
           >
-            {item.description && <p className="r-para mn-desc">{item.description}</p>}
+            {item.description && <Para className="r-para mn-desc" text={item.description} />}
           </Entry>
         ))}
       </Section>
@@ -88,6 +88,16 @@ export default function MinimalTemplate({ resume, t }) {
     ),
   }
 
+  const renderCustom = sec => (
+    <Section key={`custom:${sec.id}`} label={sec.title}>
+      {nonEmptyItems(sec.items).map(item => (
+        <Entry key={item.id} primary={item.title} secondary={item.subtitle} dates={item.meta}>
+          <Bullets text={item.description} />
+        </Entry>
+      ))}
+    </Section>
+  )
+
   return (
     <div className="mn-root">
       <header className="mn-header">
@@ -104,7 +114,9 @@ export default function MinimalTemplate({ resume, t }) {
         </div>
         {basics.photo && <img className="mn-photo" src={basics.photo} alt="" />}
       </header>
-      {visibleSections(resume).map(key => render[key]())}
+      {visibleSections(resume).map(key =>
+        key.startsWith('custom:') ? renderCustom(getCustomSection(resume, key)) : render[key](),
+      )}
     </div>
   )
 }

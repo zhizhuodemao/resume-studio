@@ -1,5 +1,5 @@
 import Icon from '../components/Icon.jsx'
-import { Bullets, buildContacts, dateRange, nonEmptyItems, visibleSections } from './shared.jsx'
+import { Bullets, Para, buildContacts, dateRange, getCustomSection, nonEmptyItems, visibleSections } from './shared.jsx'
 
 function Section({ title, children }) {
   return (
@@ -18,7 +18,7 @@ export default function BoldTemplate({ resume, t }) {
   const render = {
     summary: () => (
       <Section key="summary" title={t.sections.summary}>
-        <p className="r-para">{basics.summary}</p>
+        <Para className="r-para" text={basics.summary} />
       </Section>
     ),
     experience: () => (
@@ -66,7 +66,7 @@ export default function BoldTemplate({ resume, t }) {
               </div>
               <span className="b-entry-meta">{dateRange(item.start, item.end, present)}</span>
             </div>
-            {item.description && <p className="r-para">{item.description}</p>}
+            {item.description && <Para className="r-para" text={item.description} />}
           </div>
         ))}
       </Section>
@@ -84,6 +84,23 @@ export default function BoldTemplate({ resume, t }) {
       </Section>
     ),
   }
+
+  const renderCustom = sec => (
+    <Section key={`custom:${sec.id}`} title={sec.title}>
+      {nonEmptyItems(sec.items).map(item => (
+        <div className="b-entry" key={item.id}>
+          <div className="b-entry-head">
+            <div className="b-entry-titles">
+              {item.title && <span className="b-entry-role">{item.title}</span>}
+              {item.subtitle && <span className="b-entry-company">{item.subtitle}</span>}
+            </div>
+            {item.meta && <span className="b-entry-meta">{item.meta}</span>}
+          </div>
+          <Bullets text={item.description} />
+        </div>
+      ))}
+    </Section>
+  )
 
   return (
     <div className="b-root">
@@ -107,7 +124,9 @@ export default function BoldTemplate({ resume, t }) {
         </div>
         {basics.photo && <img className="b-photo" src={basics.photo} alt="" />}
       </header>
-      <div className="b-body">{visibleSections(resume).map(key => render[key]())}</div>
+      <div className="b-body">{visibleSections(resume).map(key =>
+        key.startsWith('custom:') ? renderCustom(getCustomSection(resume, key)) : render[key](),
+      )}</div>
     </div>
   )
 }

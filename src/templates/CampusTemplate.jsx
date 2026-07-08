@@ -1,4 +1,4 @@
-import { Bullets, ContactList, dateRange, nonEmptyItems, visibleSections } from './shared.jsx'
+import { Bullets, ContactList, Para, dateRange, getCustomSection, nonEmptyItems, visibleSections } from './shared.jsx'
 
 function Section({ title, children }) {
   return (
@@ -28,7 +28,7 @@ export default function CampusTemplate({ resume, t }) {
   const render = {
     summary: () => (
       <Section key="summary" title={t.sections.summary}>
-        <p className="r-para">{basics.summary}</p>
+        <Para className="r-para" text={basics.summary} />
       </Section>
     ),
     experience: () => (
@@ -64,7 +64,7 @@ export default function CampusTemplate({ resume, t }) {
               secondary={[item.degree, item.major].filter(Boolean).join(' · ')}
               meta={dateRange(item.start, item.end, present)}
             />
-            {item.description && <p className="r-para">{item.description}</p>}
+            {item.description && <Para className="r-para" text={item.description} />}
           </div>
         ))}
       </Section>
@@ -83,6 +83,17 @@ export default function CampusTemplate({ resume, t }) {
     ),
   }
 
+  const renderCustom = sec => (
+    <Section key={`custom:${sec.id}`} title={sec.title}>
+      {nonEmptyItems(sec.items).map(item => (
+        <div className="cp-entry" key={item.id}>
+          <EntryHead primary={item.title} secondary={item.subtitle} meta={item.meta} />
+          <Bullets text={item.description} />
+        </div>
+      ))}
+    </Section>
+  )
+
   return (
     <div className="cp-root">
       <header className="cp-header">
@@ -93,7 +104,9 @@ export default function CampusTemplate({ resume, t }) {
         </div>
         {basics.photo && <img className="cp-photo" src={basics.photo} alt="" />}
       </header>
-      {visibleSections(resume).map(key => render[key]())}
+      {visibleSections(resume).map(key =>
+        key.startsWith('custom:') ? renderCustom(getCustomSection(resume, key)) : render[key](),
+      )}
     </div>
   )
 }

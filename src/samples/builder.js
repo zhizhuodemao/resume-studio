@@ -9,6 +9,7 @@ export function makeResume({ basics, experience = [], projects = [], education =
     projects: projects.map(p => ({ id: uid(), name: '', role: '', link: '', description: '', ...p })),
     education: education.map(e => ({ id: uid(), school: '', degree: '', major: '', start: '', end: '', description: '', ...e })),
     skills: skills.map(s => ({ id: uid(), name: '', level: 3, detail: '', ...s })),
+    customSections: [],
     sectionOrder: sectionOrder ? [...sectionOrder] : [...DEFAULT_SECTION_ORDER],
     hiddenSections: [],
   }

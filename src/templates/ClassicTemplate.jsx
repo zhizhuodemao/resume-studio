@@ -1,4 +1,4 @@
-import { Bullets, ContactList, dateRange, nonEmptyItems, visibleSections } from './shared.jsx'
+import { Bullets, ContactList, Para, dateRange, getCustomSection, nonEmptyItems, visibleSections } from './shared.jsx'
 
 function Section({ title, children }) {
   return (
@@ -28,7 +28,7 @@ export default function ClassicTemplate({ resume, t }) {
   const render = {
     summary: () => (
       <Section key="summary" title={t.sections.summary}>
-        <p className="r-para">{basics.summary}</p>
+        <Para className="r-para" text={basics.summary} />
       </Section>
     ),
     experience: () => (
@@ -64,7 +64,7 @@ export default function ClassicTemplate({ resume, t }) {
               secondary={[item.degree, item.major].filter(Boolean).join(' · ')}
               dates={dateRange(item.start, item.end, present)}
             />
-            {item.description && <p className="r-para c-edu-desc">{item.description}</p>}
+            {item.description && <Para className="r-para c-edu-desc" text={item.description} />}
           </div>
         ))}
       </Section>
@@ -83,6 +83,17 @@ export default function ClassicTemplate({ resume, t }) {
     ),
   }
 
+  const renderCustom = sec => (
+    <Section key={`custom:${sec.id}`} title={sec.title}>
+      {nonEmptyItems(sec.items).map(item => (
+        <div className="c-entry" key={item.id}>
+          <EntryHead primary={item.title} secondary={item.subtitle} dates={item.meta} />
+          <Bullets text={item.description} />
+        </div>
+      ))}
+    </Section>
+  )
+
   return (
     <div className="c-root">
       <header className="c-header">
@@ -91,7 +102,9 @@ export default function ClassicTemplate({ resume, t }) {
         {basics.title && <div className="c-title">{basics.title}</div>}
         <ContactList basics={basics} withIcons={false} className="c-contacts" />
       </header>
-      {visibleSections(resume).map(key => render[key]())}
+      {visibleSections(resume).map(key =>
+        key.startsWith('custom:') ? renderCustom(getCustomSection(resume, key)) : render[key](),
+      )}
     </div>
   )
 }

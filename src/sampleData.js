@@ -20,6 +20,7 @@ export function emptyResume() {
     projects: [],
     education: [],
     skills: [],
+    customSections: [],
     sectionOrder: [...DEFAULT_SECTION_ORDER],
     hiddenSections: [],
   }

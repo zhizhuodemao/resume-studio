@@ -39,3 +39,40 @@ describe('nonEmptyItems', () => {
     expect(nonEmptyItems([{ id: 'a', x: ' ' }, { id: 'b', x: '有' }])).toHaveLength(1)
   })
 })
+
+import { parseInline } from './templates/shared.jsx'
+
+describe('parseInline (rich text)', () => {
+  it('parses bold, italic and links mixed with plain text', () => {
+    expect(parseInline('提升 **27%**，*显著* 见[官网](example.com)')).toEqual([
+      { type: 'text', text: '提升 ' },
+      { type: 'bold', text: '27%' },
+      { type: 'text', text: '，' },
+      { type: 'italic', text: '显著' },
+      { type: 'text', text: ' 见' },
+      { type: 'link', text: '官网', href: 'example.com' },
+    ])
+  })
+  it('returns plain text untouched and tolerates unclosed markers', () => {
+    expect(parseInline('普通文本')).toEqual([{ type: 'text', text: '普通文本' }])
+    expect(parseInline('**未闭合')).toEqual([{ type: 'text', text: '**未闭合' }])
+  })
+})
+
+describe('visibleSections with custom sections', () => {
+  const withCustom = {
+    ...base,
+    customSections: [
+      { id: 'c1', title: '证书', items: [{ id: 'i1', title: 'PMP', subtitle: '', meta: '', description: '' }] },
+      { id: 'c2', title: '空板块', items: [] },
+    ],
+    sectionOrder: [...base.sectionOrder, 'custom:c1', 'custom:c2'],
+  }
+  it('shows custom sections with content, hides empty ones', () => {
+    expect(visibleSections(withCustom)).toContain('custom:c1')
+    expect(visibleSections(withCustom)).not.toContain('custom:c2')
+  })
+  it('respects hiddenSections for custom keys', () => {
+    expect(visibleSections({ ...withCustom, hiddenSections: ['custom:c1'] })).not.toContain('custom:c1')
+  })
+})

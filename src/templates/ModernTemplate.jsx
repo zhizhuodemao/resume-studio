@@ -1,4 +1,4 @@
-import { Bullets, ContactList, dateRange, nonEmptyItems, visibleSections } from './shared.jsx'
+import { Bullets, ContactList, Para, dateRange, getCustomSection, nonEmptyItems, visibleSections } from './shared.jsx'
 
 function Section({ title, children }) {
   return (
@@ -26,7 +26,7 @@ export default function ModernTemplate({ resume, t }) {
   const render = {
     summary: () => (
       <Section key="summary" title={t.sections.summary}>
-        <p className="r-para">{basics.summary}</p>
+        <Para className="r-para" text={basics.summary} />
       </Section>
     ),
     experience: () => (
@@ -74,7 +74,7 @@ export default function ModernTemplate({ resume, t }) {
               </div>
               <span className="m-entry-meta">{dateRange(item.start, item.end, present)}</span>
             </div>
-            {item.description && <p className="r-para">{item.description}</p>}
+            {item.description && <Para className="r-para" text={item.description} />}
           </div>
         ))}
       </Section>
@@ -96,6 +96,23 @@ export default function ModernTemplate({ resume, t }) {
     ),
   }
 
+  const renderCustom = sec => (
+    <Section key={`custom:${sec.id}`} title={sec.title}>
+      {nonEmptyItems(sec.items).map(item => (
+        <div className="m-entry" key={item.id}>
+          <div className="m-entry-head">
+            <div className="m-entry-titles">
+              {item.title && <span className="m-entry-role">{item.title}</span>}
+              {item.subtitle && <span className="m-entry-company">{item.subtitle}</span>}
+            </div>
+            {item.meta && <span className="m-entry-meta">{item.meta}</span>}
+          </div>
+          <Bullets text={item.description} />
+        </div>
+      ))}
+    </Section>
+  )
+
   return (
     <div className="m-root">
       <header className="m-header">
@@ -106,7 +123,9 @@ export default function ModernTemplate({ resume, t }) {
         </div>
         {basics.photo && <img className="m-photo" src={basics.photo} alt="" />}
       </header>
-      {visibleSections(resume).map(key => render[key]())}
+      {visibleSections(resume).map(key =>
+        key.startsWith('custom:') ? renderCustom(getCustomSection(resume, key)) : render[key](),
+      )}
     </div>
   )
 }

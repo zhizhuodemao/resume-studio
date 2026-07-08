@@ -99,3 +99,38 @@ test('schema v1 data in localStorage migrates to v2 on load', async ({ page }) =
   await expect(page.locator('.page')).toContainText('旧版用户')
   await expect(page.locator('.page .resume.tpl-classic')).toHaveCount(1)
 })
+
+test('custom section: add preset, fill item, renders in preview', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  await page.getByRole('button', { name: '添加板块' }).click()
+  await page.getByRole('button', { name: '证书资质' }).click()
+  // custom section titles live in an <input>, so match by value not text
+  const section = page.locator('.section-card').filter({ has: page.locator('.section-title-input') }).last()
+  await expect(section.locator('.section-title-input')).toHaveValue('证书资质')
+  await section.getByRole('button', { name: '添加一项' }).click()
+  await section.getByLabel('名称', { exact: true }).fill('PMP 项目管理认证')
+  await section.getByLabel('时间 / 备注').fill('2024.06')
+  await expect(page.locator('.page')).toContainText('证书资质')
+  await expect(page.locator('.page')).toContainText('PMP 项目管理认证')
+  await expect(page.locator('.page')).toContainText('2024.06')
+})
+
+test('rich text: bold markdown renders as <strong> in preview', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  const summary = page.locator('.section-card', { hasText: '个人简介' }).locator('textarea')
+  await summary.fill('拥有 **8 年** 大型项目经验')
+  await expect(page.locator('.page strong').first()).toHaveText('8 年')
+})
+
+test('drag and drop reorders sections', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  const skillsHandle = page.locator('.section-card', { hasText: '专业技能' }).locator('.drag-handle').first()
+  const summaryCard = page.locator('.section-card', { hasText: '个人简介' })
+  // dispatch HTML5 drag events deterministically (drives our React handlers)
+  const dt = await page.evaluateHandle(() => new DataTransfer())
+  await skillsHandle.dispatchEvent('dragstart', { dataTransfer: dt })
+  await summaryCard.dispatchEvent('dragover', { dataTransfer: dt })
+  await summaryCard.dispatchEvent('drop', { dataTransfer: dt })
+  // 技能板块被拖到个人简介位置 → 预览中第一个板块标题应为 专业技能
+  await expect(page.locator('.page .m-section').first()).toContainText('专业技能')
+})

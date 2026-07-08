@@ -59,11 +59,29 @@ export function normalizeResume(r) {
       name: str(s.name), level: Number.isFinite(s.level) ? Math.min(5, Math.max(1, s.level)) : 3,
       detail: str(s.detail), id: s.id,
     })),
-    sectionOrder: Array.isArray(src.sectionOrder) && src.sectionOrder.length
-      ? src.sectionOrder.filter(k => typeof k === 'string')
-      : [...DEFAULT_SECTION_ORDER],
+    customSections: list(src.customSections).map(c => ({
+      id: typeof c.id === 'string' ? c.id : uid(),
+      title: str(c.title),
+      items: list(c.items).map(it => withId({
+        title: str(it.title), subtitle: str(it.subtitle), meta: str(it.meta), description: str(it.description), id: it.id,
+      })),
+    })),
+    sectionOrder: reconcileOrder(src),
     hiddenSections: Array.isArray(src.hiddenSections) ? src.hiddenSections.filter(k => typeof k === 'string') : [],
   }
+}
+
+// Keep sectionOrder consistent: core sections always present, custom keys
+// only for sections that exist, new custom sections appended.
+function reconcileOrder(src) {
+  const customKeys = (Array.isArray(src.customSections) ? src.customSections : [])
+    .filter(c => c && typeof c === 'object')
+    .map(c => `custom:${c.id}`)
+  let order = Array.isArray(src.sectionOrder) ? src.sectionOrder.filter(k => typeof k === 'string') : []
+  order = order.filter(k => DEFAULT_SECTION_ORDER.includes(k) || customKeys.includes(k))
+  for (const k of DEFAULT_SECTION_ORDER) if (!order.includes(k)) order.push(k)
+  for (const k of customKeys) if (!order.includes(k)) order.push(k)
+  return order
 }
 
 function normalizeDoc(d) {

@@ -190,6 +190,7 @@ export default function Toolbar({
   translating,
   canUndoTranslate,
   onUndoTranslate,
+  onToggleInsight,
 }) {
   // ?menu=template|typo|sample|ai deep-links a panel open
   const initialMenu = new URLSearchParams(window.location.search).get('menu')
@@ -445,6 +446,9 @@ export default function Toolbar({
             </div>
           )}
         </div>
+        <button className="btn btn-ghost" onClick={onToggleInsight} data-testid="insight-btn">
+          {t.insight.open}
+        </button>
         <div className="popover-wrap" ref={aiPop.ref}>
           <button
             className={`btn btn-ghost ${aiPop.open ? 'open' : ''}`}

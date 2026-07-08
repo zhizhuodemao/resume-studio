@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { uid } from '../sampleData.js'
-import { polishText } from '../ai.js'
+import { polishText, generateBullets, generateSummary } from '../ai.js'
 
-function AiAssist({ t, getPayload, onApply }) {
+function AiAssist({ t, getPayload, onApply, generate }) {
   const [phase, setPhase] = useState('idle') // idle | loading | preview | error
   const [result, setResult] = useState('')
+  const [genInput, setGenInput] = useState('')
 
   const run = async () => {
     const payload = getPayload()
@@ -13,6 +14,26 @@ function AiAssist({ t, getPayload, onApply }) {
     setPhase('loading')
     try {
       setResult(await polishText(payload.text, payload))
+      setPhase('preview')
+    } catch (err) {
+      console.error(err)
+      setPhase('error')
+    }
+  }
+
+  const runGenerate = async () => {
+    const payload = getPayload()
+    setPhase('loading')
+    try {
+      if (generate.kind === 'summary') {
+        setResult(await generateSummary(generate.getResume()))
+      } else {
+        if (!genInput.trim()) {
+          setPhase('idle')
+          return
+        }
+        setResult(await generateBullets(genInput, payload))
+      }
       setPhase('preview')
     } catch (err) {
       console.error(err)
@@ -38,6 +59,32 @@ function AiAssist({ t, getPayload, onApply }) {
             {t.ai.discard}
           </button>
         </div>
+      </div>
+    )
+  }
+
+  const isEmpty = !getPayload().text?.trim()
+
+  if (isEmpty && generate) {
+    return (
+      <div className="ai-assist ai-generate">
+        {generate.kind === 'bullets' && (
+          <input
+            className="ai-gen-input"
+            value={genInput}
+            placeholder={t.ai.generateHint}
+            onChange={e => setGenInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') runGenerate()
+            }}
+          />
+        )}
+        <button type="button" className="ai-btn" onClick={runGenerate} disabled={phase === 'loading'}>
+          {phase === 'loading'
+            ? t.ai.generating
+            : `✨ ${generate.kind === 'summary' ? t.ai.genSummary : t.ai.generate}`}
+        </button>
+        {phase === 'error' && <span className="ai-error">{t.ai.error}</span>}
       </div>
     )
   }
@@ -558,6 +605,7 @@ export default function Editor({ t, resume, setResume, placeholders }) {
           t={t}
           getPayload={() => ({ text: resume.basics.summary, kind: 'summary', role: resume.basics.title })}
           onApply={v => setBasics({ summary: v })}
+          generate={{ kind: 'summary', getResume: () => resume }}
         />
       </SectionCard>
     ),
@@ -597,6 +645,7 @@ export default function Editor({ t, resume, setResume, placeholders }) {
                   t={t}
                   getPayload={() => ({ text: item.highlights, kind: 'highlights', role: item.role, company: item.company })}
                   onApply={v => exp.update(item.id, { highlights: v })}
+                  generate={{ kind: 'bullets' }}
                 />
               </div>
             </details>
@@ -639,6 +688,7 @@ export default function Editor({ t, resume, setResume, placeholders }) {
                   t={t}
                   getPayload={() => ({ text: item.description, kind: 'project', role: item.role, name: item.name })}
                   onApply={v => proj.update(item.id, { description: v })}
+                  generate={{ kind: 'bullets' }}
                 />
               </div>
             </details>

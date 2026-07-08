@@ -141,3 +141,87 @@ export async function translateResume(resume, target) {
   if (!parsed || typeof parsed !== 'object' || !parsed.basics) throw new Error('AI returned unexpected structure')
   return mergeTranslated(resume, parsed)
 }
+
+/* ---------- Generation (L1) ---------- */
+
+export async function generateBullets(description, { role, company } = {}) {
+  const lang = hasCJK(description) ? 'zh' : 'en'
+  const system =
+    lang === 'zh'
+      ? '你是资深简历教练。把用户的一句话工作描述扩写成 3 条专业的简历要点：动词开头、突出职责与成果；不知道的数字一律用【补充数据】占位，绝不编造具体数字、规模或成果。直接输出 3 行，每行一条，不加序号或解释。'
+      : 'You are a senior resume coach. Expand the user\'s one-line description into 3 professional resume bullets: verb-first, emphasizing responsibility and impact; use [add metric] placeholders for any unknown numbers and never invent figures. Output exactly 3 lines, no numbering or commentary.'
+  const context = [role, company].filter(Boolean).join(' @ ')
+  const user = (context ? (lang === 'zh' ? `背景：${context}\n` : `Context: ${context}\n`) : '') + description
+  const result = await chat([
+    { role: 'system', content: system },
+    { role: 'user', content: user },
+  ])
+  return result
+    .split('\n')
+    .map(line => line.replace(/^\s*(?:[-•*]|\d+[.、)])\s*/, '').trimEnd())
+    .filter(Boolean)
+    .join('\n')
+}
+
+// Compact plain-text digest of a resume for analysis prompts.
+export function resumeDigest(resume) {
+  const b = resume.basics
+  const parts = []
+  if (b.name || b.title) parts.push(`${b.name} — ${b.title}`)
+  if (b.summary) parts.push(`简介: ${b.summary}`)
+  for (const e of resume.experience) {
+    parts.push(`工作: ${e.role} @ ${e.company} (${e.start}-${e.end || '至今'})\n${e.highlights}`)
+  }
+  for (const p of resume.projects) parts.push(`项目: ${p.name} ${p.role}\n${p.description}`)
+  for (const e of resume.education) parts.push(`教育: ${e.school} ${e.degree} ${e.major} ${e.description}`)
+  if (resume.skills.length) parts.push(`技能: ${resume.skills.map(s => `${s.name}(${s.detail})`).join('; ')}`)
+  for (const c of resume.customSections || []) {
+    parts.push(`${c.title}: ${c.items.map(i => `${i.title} ${i.subtitle} ${i.description}`).join('; ')}`)
+  }
+  return parts.join('\n\n').slice(0, 6000)
+}
+
+export async function generateSummary(resume) {
+  const digest = resumeDigest(resume)
+  const lang = hasCJK(digest) ? 'zh' : 'en'
+  const system =
+    lang === 'zh'
+      ? '你是资深简历教练。根据下面的简历内容，写一段 3-5 句的个人简介：第一句点明年限与专业定位，中间突出核心能力与最有说服力的量化成果，只使用简历中已有的事实与数字，绝不编造。直接输出简介文本，不加解释。'
+      : 'You are a senior resume coach. Based on the resume below, write a 3-5 sentence professional summary: open with years of experience and positioning, highlight core strengths and the most convincing quantified results. Use only facts present in the resume; never invent. Output only the summary text.'
+  return (await chat([
+    { role: 'system', content: system },
+    { role: 'user', content: digest },
+  ])).trim()
+}
+
+/* ---------- JD matching (L2) ---------- */
+
+export async function matchJD(resume, jd, uiLang = 'zh') {
+  const outLang = uiLang === 'zh' ? '中文' : 'English'
+  const system =
+    `You are an expert technical recruiter. Compare the candidate resume against the job description. Respond with JSON only, in ${outLang}, with this exact shape: ` +
+    '{"score": <0-100 integer, overall match>, "missing_keywords": [<up to 8 important JD keywords absent or weak in the resume>], ' +
+    '"strengths": [<up to 5 concrete matching strengths>], "suggestions": [<up to 6 specific, actionable resume edits for this JD>]}. ' +
+    'Be honest about gaps; do not flatter.'
+  const user = JSON.stringify({ resume: resumeDigest(resume), job_description: jd.slice(0, 6000) })
+  const result = await chat(
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    { response_format: { type: 'json_object' } },
+  )
+  let parsed
+  try {
+    parsed = JSON.parse(result)
+  } catch {
+    throw new Error('AI returned invalid JSON')
+  }
+  const arr = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string') : [])
+  return {
+    score: Number.isFinite(parsed.score) ? Math.max(0, Math.min(100, Math.round(parsed.score))) : 0,
+    missing_keywords: arr(parsed.missing_keywords),
+    strengths: arr(parsed.strengths),
+    suggestions: arr(parsed.suggestions),
+  }
+}

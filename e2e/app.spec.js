@@ -158,3 +158,44 @@ test('fit to one page compresses overflowing content', async ({ page }) => {
   await page.getByRole('button', { name: '取消压缩' }).click()
   await expect(page.locator('.page-hint')).toContainText('共 2 页')
 })
+
+test('insight drawer: health check scores and findings', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  // blank doc → low score with must-fix findings
+  await page.getByTestId('doc-switcher').click()
+  await page.getByRole('button', { name: '新建空白' }).click()
+  await page.getByTestId('insight-btn').click()
+  const drawer = page.getByTestId('insight-drawer')
+  await expect(drawer).toBeVisible()
+  await expect(drawer).toContainText('必须修复')
+  await expect(drawer).toContainText('缺少姓名')
+  // sample resume scores much higher
+  await page.getByTestId('doc-switcher').click()
+  await page.locator('.docs-item', { hasText: '我的简历' }).click()
+  await expect(drawer.locator('.score-num')).not.toHaveText(/^([0-5]?\d)$/)
+})
+
+test('JD match analyzes against a mocked AI response', async ({ page }) => {
+  await page.route('**/api/ai/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          score: 72,
+          missing_keywords: ['Kubernetes', '微服务'],
+          strengths: ['React 技术栈深度匹配'],
+          suggestions: ['补充容器化相关经验'],
+        }) } }],
+      }),
+    }),
+  )
+  await page.goto('/?onboarding=0&panel=insight')
+  await page.getByRole('button', { name: 'JD 匹配' }).click()
+  await page.locator('.jd-input').fill('招聘高级前端工程师，要求 React、Kubernetes、微服务经验')
+  await page.getByRole('button', { name: '开始分析' }).click()
+  const drawer = page.getByTestId('insight-drawer')
+  await expect(drawer).toContainText('72')
+  await expect(drawer).toContainText('Kubernetes')
+  await expect(drawer).toContainText('React 技术栈深度匹配')
+  await expect(drawer).toContainText('补充容器化相关经验')
+})

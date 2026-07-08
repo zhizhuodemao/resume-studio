@@ -13,6 +13,7 @@ import Toolbar from './components/Toolbar.jsx'
 import Editor from './components/Editor.jsx'
 import Preview from './components/Preview.jsx'
 import Onboarding from './components/Onboarding.jsx'
+import Insight from './components/Insight.jsx'
 import Resume, { TEMPLATE_IDS } from './templates/Resume.jsx'
 import { translateResume } from './ai.js'
 
@@ -94,6 +95,9 @@ const HISTORY_COALESCE_MS = 700
 export default function App() {
   const [state, setState] = useState(initialState)
   const [onboarding, setOnboarding] = useState(shouldShowOnboarding)
+  const [insightOpen, setInsightOpen] = useState(
+    () => new URLSearchParams(window.location.search).get('panel') === 'insight',
+  )
   const { lang, resumes, activeId } = state
   const active = resumes.find(d => d.id === activeId) || resumes[0]
   const t = MESSAGES[lang]
@@ -443,12 +447,22 @@ export default function App() {
           translating={translating}
           canUndoTranslate={Boolean(translateBackup)}
           onUndoTranslate={handleUndoTranslate}
+          onToggleInsight={() => setInsightOpen(o => !o)}
         />
         <div className="app-body">
           <Editor t={t} resume={active.resume} setResume={setResume} placeholders={placeholders} />
           <Preview t={t} page={active.page} onFitToggle={handleFitToggle}>
             {resumeNode}
           </Preview>
+          {insightOpen && (
+            <Insight
+              t={t}
+              lang={lang}
+              resume={active.resume}
+              sectionsLabel={key => t.sections[key] || key}
+              onClose={() => setInsightOpen(false)}
+            />
+          )}
         </div>
       </div>
       {active.page.size === 'letter' && <style>{'@media print { @page { size: letter; margin: 0 } }'}</style>}

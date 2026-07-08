@@ -1,6 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { checkResume } from '../checker.js'
 import { getGuestQuota } from '../api.js'
+import { renderInline } from '../templates/shared.jsx'
+
+// Lightweight markdown for assistant bubbles: paragraphs, "- " lists,
+// and the same inline **bold**/*italic*/[link] grammar as the resume.
+function BubbleText({ text }) {
+  const blocks = []
+  let list = null
+  for (const ln of String(text).split('\n')) {
+    const m = ln.match(/^\s*[-•]\s+(.*)/)
+    if (m) {
+      if (!list) list = []
+      list.push(m[1])
+      continue
+    }
+    if (list) {
+      blocks.push({ type: 'ul', items: list })
+      list = null
+    }
+    if (ln.trim()) blocks.push({ type: 'p', text: ln })
+  }
+  if (list) blocks.push({ type: 'ul', items: list })
+  return blocks.map((b, i) =>
+    b.type === 'ul' ? (
+      <ul key={i}>
+        {b.items.map((item, j) => (
+          <li key={j}>{renderInline(item)}</li>
+        ))}
+      </ul>
+    ) : (
+      <p key={i}>{renderInline(b.text)}</p>
+    ),
+  )
+}
 
 // The left-hand conversation panel: one assistant that coaches, edits,
 // analyzes and tailors. Changes appear as chips with per-turn undo.
@@ -135,15 +168,15 @@ export default function Assistant({ t, lang, doc, authUser, onRunTurn, onUndoSna
 
   return (
     <aside className="assistant" data-testid="assistant">
-      <div className="assistant-health" onClick={() => setShowFindings(v => !v)}>
-        <span className="assistant-score" style={{ color: scoreColor }}>
-          {report.score}
-        </span>
-        <span className="assistant-health-text">
-          {report.findings.length === 0 ? t.insight.empty : t.assistant.findings(report.findings.length)}
-        </span>
-        <span className="assistant-health-toggle">{showFindings ? '▾' : '▸'}</span>
-      </div>
+      {report.findings.length > 0 && (
+        <div className="assistant-health" onClick={() => setShowFindings(v => !v)}>
+          <span className="assistant-score" style={{ color: scoreColor }}>
+            {report.score}
+          </span>
+          <span className="assistant-health-text">{t.assistant.findings(report.findings.length)}</span>
+          <span className="assistant-health-toggle">{showFindings ? '▾' : '▸'}</span>
+        </div>
+      )}
       {!authUser && guestQuota && (
         <div className="guest-chip" data-testid="guest-chip">
           <span>{t.assistant.guestMode(guestQuota.remaining)}</span>
@@ -164,7 +197,11 @@ export default function Assistant({ t, lang, doc, authUser, onRunTurn, onUndoSna
         {messages.map((m, i) => (
           <div key={i} className={`coach-msg coach-msg-${m.role} ${m.error ? 'coach-msg-error' : ''} ${m.nudge ? 'coach-msg-nudge' : ''}`}>
             <div className={`coach-bubble ${m.streaming ? 'streaming' : ''}`}>
-              {m.content || (m.streaming ? t.coach.thinking : '')}
+              {m.role === 'assistant' && m.content ? (
+                <BubbleText text={m.content} />
+              ) : (
+                m.content || (m.streaming ? t.coach.thinking : '')
+              )}
             </div>
             {m.streaming && m.working && (
               <div className="assistant-working">

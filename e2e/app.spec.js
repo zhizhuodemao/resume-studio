@@ -170,20 +170,17 @@ test('fit to one page compresses overflowing content', async ({ page }) => {
   await expect(page.locator('.page-hint')).toContainText('共 2 页')
 })
 
-test('assistant health card: score and findings update live', async ({ page }) => {
+test('assistant health card: hidden when perfect, findings when not', async ({ page }) => {
   await page.goto('/?onboarding=0')
-  // blank doc → low score with must-fix findings in the ambient card
+  const assistant = page.getByTestId('assistant')
+  // perfect sample resume → no nagging score card at all
+  await expect(assistant.locator('.assistant-health')).toHaveCount(0)
+  // blank doc → the card appears with must-fix findings
   await page.getByTestId('doc-switcher').click()
   await page.getByRole('button', { name: '新建空白' }).click()
-  const assistant = page.getByTestId('assistant')
   await expect(assistant.locator('.assistant-health-text')).toContainText('优化建议')
   await assistant.locator('.assistant-health').click()
   await expect(assistant.locator('.assistant-findings')).toContainText('缺少姓名')
-  // sample resume scores much higher (findings shrink or vanish)
-  await page.getByTestId('doc-switcher').click()
-  await page.locator('.docs-item', { hasText: '我的简历' }).click()
-  const score = await assistant.locator('.assistant-score').textContent()
-  expect(Number(score)).toBeGreaterThan(60)
 })
 
 test('assistant coaches: interview turn writes into the resume', async ({ page }) => {
@@ -465,4 +462,49 @@ test('guest conversion nudge appears after a successful AI edit', async ({ page 
   const assistant = page.getByTestId('assistant')
   await expect(assistant).toContainText('云端备份')
   await expect(assistant.getByRole('button', { name: '免费注册 / 登录' })).toBeVisible()
+})
+
+test('assistant bubbles render markdown instead of raw asterisks', async ({ page }) => {
+  await page.route('**/api/ai/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: {
+          content: '建议如下：\n- 突出 **量化成果**\n- 精简第二段',
+          tool_calls: [],
+        } }],
+      }),
+    }),
+  )
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('cmd-input').fill('给点建议')
+  await page.getByTestId('cmd-input').press('Enter')
+  const assistant = page.getByTestId('assistant')
+  await expect(assistant.locator('.coach-bubble strong')).toHaveText('量化成果')
+  await expect(assistant.locator('.coach-bubble li')).toHaveCount(2)
+  await expect(assistant).not.toContainText('**')
+})
+
+test('agent guardrail: narrated edit without tools triggers a forced action retry', async ({ page }) => {
+  let call = 0
+  await page.route('**/api/ai/**', route => {
+    call += 1
+    const msg =
+      call === 1
+        ? { content: '好的，个人简介已更新为更有冲击力的版本。', tool_calls: [] }
+        : {
+            content: '已通过工具完成修改。',
+            tool_calls: [
+              { id: '1', type: 'function', function: { name: 'update_resume_content', arguments: JSON.stringify({ summary: '守护机制写入的简介' }) } },
+            ],
+          }
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: msg }] }) })
+  })
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('cmd-input').fill('帮我修改个人简介')
+  await page.getByTestId('cmd-input').press('Enter')
+  // the retry actually executed the tool
+  await expect(page.locator('.preview .page')).toContainText('守护机制写入的简介')
+  expect(call).toBe(2)
+  await expect(page.getByTestId('assistant')).toContainText('内容已更新')
 })

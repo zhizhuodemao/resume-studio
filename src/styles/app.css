@@ -2507,3 +2507,29 @@ details[open] > summary .section-chevron {
   color: var(--text);
   text-decoration: underline;
 }
+
+/* Markdown inside assistant bubbles */
+.coach-bubble p {
+  margin: 0 0 7px;
+}
+
+.coach-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.coach-bubble ul {
+  margin: 0 0 7px;
+  padding-left: 18px;
+}
+
+.coach-bubble ul:last-child {
+  margin-bottom: 0;
+}
+
+.coach-bubble li {
+  margin: 2px 0;
+}
+
+.coach-bubble a {
+  color: #175cd3;
+}

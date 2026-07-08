@@ -439,7 +439,25 @@ export default function App() {
       const s0 = stateRef.current
       const doc = s0.resumes.find(d => d.id === s0.activeId)
       if (!doc) return { message: '', labels: [], snapshot: null }
-      const { message, actions } = await assistantTurn(history, doc, t, s0.lang, callbacks)
+      let turn = await assistantTurn(history, doc, t, s0.lang, callbacks)
+      // Agent guardrail: the model sometimes narrates an edit without
+      // calling any tool. Catch the claim and force one action retry.
+      const CLAIM = /已(更新|修改|切换|调整|写入|替换|完成)|updated|changed|switched/i
+      if (!turn.actions.length && CLAIM.test(turn.message)) {
+        callbacks?.onDelta?.('\n\n')
+        turn = await assistantTurn(
+          [
+            ...history,
+            { role: 'assistant', content: turn.message },
+            { role: 'user', content: t.assistant.actNudge },
+          ],
+          doc,
+          t,
+          s0.lang,
+          callbacks,
+        )
+      }
+      const { message, actions } = turn
       const snapshot = {
         template: doc.template,
         accent: doc.accent,

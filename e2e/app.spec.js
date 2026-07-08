@@ -164,6 +164,7 @@ test('insight drawer: health check scores and findings', async ({ page }) => {
   // blank doc → low score with must-fix findings
   await page.getByTestId('doc-switcher').click()
   await page.getByRole('button', { name: '新建空白' }).click()
+  await page.getByTestId('ai-menu-btn').click()
   await page.getByTestId('insight-btn').click()
   const drawer = page.getByTestId('insight-drawer')
   await expect(drawer).toBeVisible()
@@ -295,4 +296,31 @@ test('mobile layout: tab bar switches between edit and preview', async ({ page }
   await page.locator('.mobile-tabs').getByRole('button', { name: '预览' }).click()
   await expect(page.locator('.editor')).toBeHidden()
   await expect(page.locator('.preview')).toBeVisible()
+})
+
+test('toolbar fits common laptop widths without horizontal overflow', async ({ page }) => {
+  for (const width of [1680, 1440, 1366, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/?onboarding=0')
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow, `overflow at ${width}px`).toBeLessThanOrEqual(0)
+    // export button (rightmost) must be fully visible
+    const btn = page.getByRole('button', { name: /导出 PDF/ })
+    const box = await btn.boundingBox()
+    expect(box.x + box.width, `export button clipped at ${width}px`).toBeLessThanOrEqual(width)
+  }
+})
+
+test('AI menu and more menu expose the consolidated actions', async ({ page }) => {
+  await page.goto('/?onboarding=0')
+  await page.getByTestId('ai-menu-btn').click()
+  await expect(page.getByTestId('coach-btn')).toBeVisible()
+  await expect(page.getByRole('button', { name: '译成英文' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByTestId('more-btn').click()
+  await expect(page.getByRole('button', { name: '载入示例' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '清空内容' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'EN' })).toBeVisible()
 })

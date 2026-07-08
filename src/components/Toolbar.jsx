@@ -403,19 +403,86 @@ export default function Toolbar({
 
       <div className="toolbar-actions">
         {savedAt && (
-          <span className="saved-indicator" title={savedAt.toLocaleTimeString()}>
-            {t.autoSaved}
-          </span>
+          <span className="saved-indicator" title={`${t.autoSaved} ${savedAt.toLocaleTimeString()}`} />
         )}
+        <div className="popover-wrap" ref={aiPop.ref}>
+          <button
+            className={`btn btn-ghost ${aiPop.open ? 'open' : ''}`}
+            onClick={() => aiPop.setOpen(!aiPop.open)}
+            data-testid="ai-menu-btn"
+          >
+            ✨ AI
+          </button>
+          {aiPop.open && (
+            <div className="popover popover-right popover-menu">
+              <button
+                className="menu-item"
+                data-testid="insight-btn"
+                onClick={() => {
+                  aiPop.setOpen(false)
+                  onToggleInsight()
+                }}
+              >
+                {t.insight.open}
+              </button>
+              <button
+                className="menu-item"
+                data-testid="coach-btn"
+                onClick={() => {
+                  aiPop.setOpen(false)
+                  onToggleCoach()
+                }}
+              >
+                {t.coach.open}
+              </button>
+              <div className="menu-divider" />
+              <button
+                className="menu-item"
+                disabled={translating}
+                onClick={() => {
+                  aiPop.setOpen(false)
+                  onTranslate('en')
+                }}
+              >
+                {translating ? t.ai.translating : t.ai.toEn}
+              </button>
+              <button
+                className="menu-item"
+                disabled={translating}
+                onClick={() => {
+                  aiPop.setOpen(false)
+                  onTranslate('zh')
+                }}
+              >
+                {translating ? t.ai.translating : t.ai.toZh}
+              </button>
+              {canUndoTranslate && (
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    aiPop.setOpen(false)
+                    onUndoTranslate()
+                  }}
+                >
+                  {t.ai.undoTranslate}
+                </button>
+              )}
+              <p className="menu-note">{t.ai.translateNote}</p>
+            </div>
+          )}
+        </div>
         <div className="popover-wrap" ref={samplePop.ref}>
           <button
-            className={`btn btn-ghost ${samplePop.open ? 'open' : ''}`}
+            className={`btn btn-ghost more-btn ${samplePop.open ? 'open' : ''}`}
             onClick={() => samplePop.setOpen(!samplePop.open)}
+            title={t.more}
+            data-testid="more-btn"
           >
-            {t.loadSample}
+            ⋯
           </button>
           {samplePop.open && (
             <div className="popover popover-right popover-sample">
+              <div className="menu-heading">{t.loadSample}</div>
               <div className="sample-row">
                 <span className="typo-label">{t.samplePanel.direction}</span>
                 <div className="track-chips">
@@ -452,60 +519,24 @@ export default function Toolbar({
                   {t.samplePanel.apply}
                 </button>
               </div>
-            </div>
-          )}
-        </div>
-        <button className="btn btn-ghost" onClick={onToggleInsight} data-testid="insight-btn">
-          {t.insight.open}
-        </button>
-        <button className="btn btn-ghost" onClick={onToggleCoach} data-testid="coach-btn">
-          ✨ {t.coach.open}
-        </button>
-        <div className="popover-wrap" ref={aiPop.ref}>
-          <button
-            className={`btn btn-ghost ${aiPop.open ? 'open' : ''}`}
-            disabled={translating}
-            onClick={() => aiPop.setOpen(!aiPop.open)}
-          >
-            {translating ? t.ai.translating : `✨ ${t.ai.translate}`}
-          </button>
-          {aiPop.open && (
-            <div className="popover popover-right popover-ai">
-              <p className="sample-note">{t.ai.translateNote}</p>
-              <div className="ai-translate-actions">
+              <div className="menu-divider" />
+              <div className="more-row">
                 <button
-                  className="btn btn-small"
+                  className="btn btn-small btn-danger"
                   onClick={() => {
-                    aiPop.setOpen(false)
-                    onTranslate('en')
+                    samplePop.setOpen(false)
+                    onClear()
                   }}
                 >
-                  {t.ai.toEn}
+                  {t.clearAll}
                 </button>
-                <button
-                  className="btn btn-small"
-                  onClick={() => {
-                    aiPop.setOpen(false)
-                    onTranslate('zh')
-                  }}
-                >
-                  {t.ai.toZh}
+                <button className="btn btn-small" onClick={() => onPatch({ lang: lang === 'zh' ? 'en' : 'zh' })}>
+                  {t.language}
                 </button>
               </div>
             </div>
           )}
         </div>
-        {canUndoTranslate && (
-          <button className="btn btn-ghost" onClick={onUndoTranslate}>
-            {t.ai.undoTranslate}
-          </button>
-        )}
-        <button className="btn btn-ghost btn-danger" onClick={onClear}>
-          {t.clearAll}
-        </button>
-        <button className="btn btn-ghost" onClick={() => onPatch({ lang: lang === 'zh' ? 'en' : 'zh' })}>
-          {t.language}
-        </button>
         <button className="btn btn-primary" onClick={onExport} title={t.exportHint}>
           <Icon name="download" size={15} />
           {t.exportPdf}
